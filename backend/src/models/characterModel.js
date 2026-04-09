@@ -3,9 +3,21 @@ const db = require('../config/database');
 const CharacterModel = {
   create: (data, callback) => {
     const sql = `
-      INSERT INTO characters 
-      (user_id, name, idade, classe, trilha, origem, nex, nivel)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO characters (
+        user_id, name, idade, classe, trilha, origem, nex, nivel,
+
+        vida_atual, vida_max, vida_temp,
+        sanidade_atual, sanidade_max,
+        esforco_atual, esforco_max, esforco_temp,
+
+        prestigio,
+        morrendo, enlouquecendo,
+
+        deslocamento_atual, deslocamento_max,
+
+        imagem_perfil, imagem_token
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -16,7 +28,29 @@ const CharacterModel = {
       data.trilha,
       data.origem,
       data.nex,
-      data.nivel
+      data.nivel,
+
+      data.vida_atual || 0,
+      data.vida_max || 0,
+      data.vida_temp || 0,
+
+      data.sanidade_atual || 0,
+      data.sanidade_max || 0,
+
+      data.esforco_atual || 0,
+      data.esforco_max || 0,
+      data.esforco_temp || 0,
+
+      data.prestigio || 0,
+
+      data.morrendo || 0,
+      data.enlouquecendo || 0,
+
+      data.deslocamento_atual || 0,
+      data.deslocamento_max || 0,
+
+      data.imagem_perfil || null,
+      data.imagem_token || null
     ];
 
     db.query(sql, values, callback);
@@ -24,7 +58,21 @@ const CharacterModel = {
 
   findAll: (callback) => {
     db.query('SELECT * FROM characters', callback);
-  }
+  },
+
+  findByUserId: (userId, callback) => {
+  const sql = `SELECT * FROM characters WHERE user_id = ?`;
+  db.query(sql, [userId], callback);
+  },
+
+  findById: (id, callback) => {
+  const sql = `SELECT * FROM characters WHERE id = ?`;
+  db.query(sql, [id], (err, results) => {
+    if (err) return callback(err);
+
+    callback(null, results[0]);
+  });
+}
 };
 
 module.exports = CharacterModel;

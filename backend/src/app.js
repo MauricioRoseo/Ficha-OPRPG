@@ -5,10 +5,17 @@ require('./config/database');
 
 const app = express();
 const characterRoutes = require('./routes/characterRoutes');
+const attributeRoutes = require('./routes/attributeRoutes');
+const featureRoutes = require('./routes/featureRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 app.use(cors());
 app.use(express.json());
 app.use('/characters', characterRoutes);
+app.use('/attributes', attributeRoutes);
+app.use('/features', featureRoutes);
+app.use('/auth', authRoutes);
+
 app.get('/', (req, res) => {
   res.send('API Ficha OPRPG funcionando 🚀');
 });

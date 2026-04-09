@@ -155,3 +155,43 @@ CREATE TABLE system_features (
     FOREIGN KEY (system_id) REFERENCES systems(id) ON DELETE CASCADE,
     FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE
 );
+
+ALTER TABLE character_features
+DROP COLUMN trained;
+
+ALTER TABLE character_features
+ADD training_level ENUM('none', 'trained', 'veteran', 'expert') DEFAULT 'none';
+
+ALTER TABLE features
+ADD COLUMN metadata JSON;
+
+ALTER TABLE characters
+
+-- VIDA
+ADD vida_atual INT DEFAULT 0,
+ADD vida_max INT DEFAULT 0,
+ADD vida_temp INT DEFAULT 0,
+
+-- SANIDADE
+ADD sanidade_atual INT DEFAULT 0,
+ADD sanidade_max INT DEFAULT 0,
+
+-- ESFORÇO
+ADD esforco_atual INT DEFAULT 0,
+ADD esforco_max INT DEFAULT 0,
+ADD esforco_temp INT DEFAULT 0,
+
+-- PRESTÍGIO
+ADD prestigio INT DEFAULT 0,
+
+-- ESTADOS
+ADD morrendo TINYINT DEFAULT 0,
+ADD enlouquecendo TINYINT DEFAULT 0,
+
+-- DESLOCAMENTO
+ADD deslocamento_atual INT DEFAULT 0,
+ADD deslocamento_max INT DEFAULT 0,
+
+-- IMAGENS
+ADD imagem_perfil TEXT,
+ADD imagem_token TEXT;
