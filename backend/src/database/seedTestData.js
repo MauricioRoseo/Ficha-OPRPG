@@ -14,103 +14,173 @@ const query = (sql, values = []) => {
 
 const seed = async () => {
   try {
-    console.log('🌱 Iniciando seed de teste...');
+    console.log('🌱 Iniciando seed de teste expandida...');
 
-    // 🧑 1. Criar usuário
-    const password = await bcrypt.hash('1234', 10);
+    // helper para criar usuário
+    const createUser = async (name, email, plainPassword = '1234') => {
+      // check existing
+      const existing = await query(`SELECT id FROM users WHERE email = ?`, [email]);
+      if (existing && existing.length > 0) {
+        console.log('ℹ Usuário já existe:', email, existing[0].id);
+        return existing[0].id;
+      }
 
-    const userResult = await query(
-      `INSERT INTO users (name, email, password)
-       VALUES (?, ?, ?)`,
-      ['Teste', 'teste@email.com', password]
-    );
+      const hashed = await bcrypt.hash(plainPassword, 10);
+      const res = await query(`INSERT INTO users (name, email, password) VALUES (?, ?, ?)`, [name, email, hashed]);
+      console.log('✔ Usuário criado:', name, res.insertId);
+      return res.insertId;
+    };
 
-    const userId = userResult.insertId;
-
-    console.log('✔ Usuário criado:', userId);
-
-    // 🧍 2. Criar personagem
-    const charResult = await query(
-      `INSERT INTO characters (
-        user_id, name, classe, nex, nivel,
-        vida_atual, vida_max,
-        sanidade_atual, sanidade_max,
-        esforco_atual, esforco_max
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
+    // helper para criar personagem com atributos básicos
+    const createCharacter = async (userId, charData) => {
+      const values = [
         userId,
-        'Agente Teste',
-        'Combatente',
-        20,
-        4,
-        15,
-        20,
-        12,
-        16,
-        3,
-        5
-      ]
-    );
+        charData.name,
+        charData.classe || null,
+        charData.trilha || null,
+        charData.origem || null,
+        charData.nex || 0,
+        charData.nivel || 0,
+        charData.vida_atual || 0,
+        charData.vida_max || 0,
+        charData.sanidade_atual || 0,
+        charData.sanidade_max || 0,
+        charData.esforco_atual || 0,
+        charData.esforco_max || 0,
+        charData.prestigio || 0,
+        charData.morrendo || 0,
+        charData.enlouquecendo || 0,
+        charData.deslocamento_atual || 0,
+        charData.deslocamento_max || 0,
+        charData.imagem_perfil || null,
+        charData.imagem_token || null,
+        charData.idade || null
+      ];
 
-    const characterId = charResult.insertId;
+      const sql = `INSERT INTO characters (
+        user_id, name, classe, trilha, origem, nex, nivel,
+        vida_atual, vida_max, sanidade_atual, sanidade_max,
+        esforco_atual, esforco_max, prestigio, morrendo, enlouquecendo,
+        deslocamento_atual, deslocamento_max, imagem_perfil, imagem_token, idade
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
 
-    console.log('✔ Personagem criado:', characterId);
+      const res = await query(sql, values);
+      console.log(`✔ Personagem criado: ${charData.name} (id=${res.insertId})`);
+      return res.insertId;
+    };
 
-    // 💪 3. Criar atributos
-    await query(
-      `INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [characterId, 3, 2, 1, 2, 1]
-    );
+    // criar vários usuários
+    const u1 = await createUser('Teste', 'teste@email.com');
+    const u2 = await createUser('Alice Silva', 'alice@example.com');
+    const u3 = await createUser('Carlos Ramos', 'carlos@example.com');
+    const u4 = await createUser('Mariana Costa', 'mariana@example.com');
 
-    console.log('✔ Atributos criados');
+    // criar personagens para cada usuário
+    const c1 = await createCharacter(u1, {
+      name: 'Agente Teste', classe: 'Combatente', nex: 20, nivel: 4,
+      vida_atual: 15, vida_max: 20, sanidade_atual: 12, sanidade_max: 16,
+      esforco_atual: 3, esforco_max: 5, idade: 32, origem: 'Distrito 7', prestigio: 10,
+      imagem_perfil: null, imagem_token: null
+    });
 
-    // 🔍 4. Buscar features base
+    const c2 = await createCharacter(u2, {
+      name: 'Operativa Violeta', classe: 'Infiltrador', trilha: 'Sombra', nex: 35, nivel: 7,
+      vida_atual: 18, vida_max: 22, sanidade_atual: 14, sanidade_max: 16,
+      esforco_atual: 4, esforco_max: 6, idade: 28, origem: 'Colônia Leste', prestigio: 45,
+      imagem_perfil: 'https://placekitten.com/420/420', imagem_token: null
+    });
+
+    const c3 = await createCharacter(u3, {
+      name: 'Dr. Ramos', classe: 'Especialista', trilha: 'Cientista', nex: 50, nivel: 10,
+      vida_atual: 12, vida_max: 14, sanidade_atual: 10, sanidade_max: 14,
+      esforco_atual: 2, esforco_max: 4, idade: 45, origem: 'Centro de Pesquisa', prestigio: 120,
+      imagem_perfil: null, imagem_token: 'https://placekitten.com/300/450'
+    });
+
+    const c4 = await createCharacter(u4, {
+      name: 'Mariana Costa', classe: 'Healer', trilha: 'Clérigo', nex: 60, nivel: 12,
+      vida_atual: 16, vida_max: 18, sanidade_atual: 16, sanidade_max: 18,
+      esforco_atual: 5, esforco_max: 7, idade: 34, origem: 'Templo Norte', prestigio: 210,
+      imagem_perfil: 'https://placekitten.com/410/410', imagem_token: 'https://placekitten.com/250/375'
+    });
+
+    // criar atributos para cada personagem
+    await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c1, 3, 2, 1, 2, 1]);
+    await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c2, 2, 4, 3, 3, 2]);
+    await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c3, 1, 2, 5, 1, 2]);
+    await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c4, 2, 2, 3, 3, 4]);
+
+    console.log('✔ Atributos criados para personagens de exemplo');
+
+    // buscar features base
     const features = await query(`SELECT * FROM features`);
 
-    // pegar só algumas
-    const luta = features.find(f => f.name === 'Luta');
-    const ritual = features.find(f => f.name === 'Cicatrização');
-    const habilidade = features.find(f => f.name === 'Acalentar');
+    const find = (name) => features.find(f => f.name === name);
 
-    // 🔗 5. Vincular features
+    // vincular features variadas a cada personagem
+    const luta = find('Luta');
+    const furtividade = find('Furtividade');
+    const percepcao = find('Percepção');
+    const investigacao = find('Investigação');
+    const persuasao = find('Persuasão');
+    const cicatriz = find('Cicatrização');
+    const protecao = find('Proteção');
+    const purificacao = find('Purificação');
+    const acalentar = find('Acalentar');
+    const curaRapida = find('Cura Rápida');
+    const conhecimento = find('Conhecimento Arcano');
+    const aprimorar = find('Aprimorar Arma');
 
-    if (luta) {
-      await query(
-        `INSERT INTO character_features
-        (character_id, feature_id, value, training_level, extra)
-        VALUES (?, ?, ?, ?, ?)`,
-        [characterId, luta.id, 3, 'veteran', 2]
-      );
-      console.log('✔ Luta vinculada');
-    }
+    const addFeature = async (charId, feat, opts = {}) => {
+      if (!feat) return;
+      // avoid duplicate link
+      const exists = await query(`SELECT id FROM character_features WHERE character_id = ? AND feature_id = ?`, [charId, feat.id]);
+      if (exists && exists.length > 0) {
+        console.log(`ℹ Feature ${feat.name} já vinculada a char ${charId}`);
+        return;
+      }
 
-    if (ritual) {
-      await query(
-        `INSERT INTO character_features
-        (character_id, feature_id)
-        VALUES (?, ?)`,
-        [characterId, ritual.id]
-      );
-      console.log('✔ Ritual vinculado');
-    }
+      const sql = `INSERT INTO character_features (character_id, feature_id, value, training_level, extra) VALUES (?, ?, ?, ?, ?)`;
+      // training_level must match enum: 'none', 'trained', 'veteran', 'expert'
+      const vals = [charId, feat.id, opts.value || 1, opts.training_level || 'none', opts.extra || null];
+      await query(sql, vals);
+      console.log(`✔ Feature ${feat.name} vinculada a char ${charId}`);
+    };
 
-    if (habilidade) {
-      await query(
-        `INSERT INTO character_features
-        (character_id, feature_id)
-        VALUES (?, ?)`,
-        [characterId, habilidade.id]
-      );
-      console.log('✔ Habilidade vinculada');
-    }
+    // Agente Teste (c1)
+    await addFeature(c1, luta, { value: 3, training_level: 'veteran', extra: 2 });
+    await addFeature(c1, percepcao, { value: 2, training_level: 'trained' });
+  await addFeature(c1, acalentar, { value: 1, training_level: 'none' });
 
-    console.log('✅ Seed de teste finalizada');
+    // Operativa Violeta (c2)
+    await addFeature(c2, furtividade, { value: 4, training_level: 'veteran' });
+    await addFeature(c2, investigacao, { value: 3, training_level: 'trained' });
+    await addFeature(c2, persuasao, { value: 2, training_level: 'trained' });
+
+    // Dr. Ramos (c3)
+    await addFeature(c3, conhecimento, { value: 5, training_level: 'veteran' });
+    await addFeature(c3, purificacao, { value: 2, training_level: 'trained' });
+    await addFeature(c3, aprimorar, { value: 2, training_level: 'trained' });
+
+    // Mariana (c4)
+    await addFeature(c4, curaRapida, { value: 4, training_level: 'veteran' });
+    await addFeature(c4, cicatriz, { value: 3, training_level: 'trained' });
+    await addFeature(c4, percepcao, { value: 2, training_level: 'trained' });
+
+    // mais personagens (exemplos rápido)
+    const c5 = await createCharacter(u2, { name: 'Sombras', classe: 'Scout', nex: 30, nivel: 6, idade: 26, origem: 'Distrito 3', imagem_perfil: null });
+    await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c5, 2, 4, 2, 2, 1]);
+    await addFeature(c5, furtividade, { value: 3, training_level: 'trained' });
+
+    const c6 = await createCharacter(u3, { name: 'Engenheiro K', classe: 'Technician', nex: 40, nivel: 8, idade: 38, origem: 'Oficina Central' });
+    await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c6, 2, 2, 4, 2, 1]);
+    await addFeature(c6, conhecimento, { value: 3, training_level: 'trained' });
+
+    console.log('✅ Seed de teste expandida finalizada');
     process.exit();
 
   } catch (err) {
-    console.error('Erro no seed:', err);
+    console.error('Erro no seed expandida:', err);
     process.exit(1);
   }
 };

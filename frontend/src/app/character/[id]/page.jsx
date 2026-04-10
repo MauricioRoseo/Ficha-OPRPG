@@ -1,234 +1,190 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 
 export default function CharacterPage() {
-  const { id } = useParams();
+  const params = useParams();
   const router = useRouter();
+  const { id } = params || {};
 
-  const [data, setData] = useState(null);
+  const [character, setCharacter] = useState(null);
+  const [status, setStatus] = useState("");
+  const [currentUserName, setCurrentUserName] = useState("");
 
   useEffect(() => {
+    if (!id) return;
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      router.push("/");
+      return;
+    }
+
+    // set current logged user name from token for 'Jogador' field
+    try {
+      const parts = token.split('.');
+      if (parts.length >= 2) {
+        const payload = JSON.parse(atob(parts[1]));
+        setCurrentUserName(payload.name || payload.email || "");
+      }
+    } catch (e) {
+      // ignore
+    }
+
     const fetchCharacter = async () => {
-      const token = localStorage.getItem("token");
-
-      const res = await fetch(`http://localhost:3001/characters/${id}/full`, {
-        headers: {
-          Authorization: `Bearer ${token}`
+      setStatus("> carregando ficha...");
+      try {
+        const res = await fetch(`http://localhost:3001/characters/${id}/full`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) {
+          setStatus("> erro ao carregar ficha");
+          return;
         }
-      });
-
-      const result = await res.json();
-      setData(result);
+        const data = await res.json();
+        // backend returns { character, attributes, features }
+        setCharacter(data.character || data);
+        setStatus("");
+      } catch (err) {
+        setStatus("> erro de conexão");
+      }
     };
 
     fetchCharacter();
   }, [id]);
 
-  if (!data) return null;
+  if (status) {
+    return (
+      <div className="p-6">
+        <p className="font-mono text-green-400">{status}</p>
+      </div>
+    );
+  }
 
-  const { character, attributes } = data;
+  if (!character) {
+    return (
+      <div className="p-6">
+        <p>Nenhuma ficha encontrada.</p>
+      </div>
+    );
+  }
 
-  const percent = (atual, max) =>
-    max ? Math.min((atual / max) * 100, 100) : 0;
+  const getPatente = (prestigio = 0) => {
+    if (prestigio >= 200) return "Agente de Elite";
+    if (prestigio >= 100) return "Oficial de Operações";
+    if (prestigio >= 50) return "Agente Especial";
+    if (prestigio >= 20) return "Operador";
+    return "Recruta";
+  };
 
   return (
-    <div className="min-h-screen bg-black text-white p-6">
+    <div className="p-6">
+      <div className="surface-block mb-6">
+        <div className="flex items-center justify-between py-4 px-6">
+          <div>
+            <h2 className="text-lg font-bold">{character.name}</h2>
+            <p className="text-xs text-gray-400">Jogador: {currentUserName || character.user_name || "-"}</p>
+          </div>
 
-      {/* VOLTAR */}
-      <button
-        onClick={() => router.push("/dashboard")}
-        className="mb-4 text-xs border px-3 py-1"
-      >
-        ← VOLTAR
-      </button>
-
-        {/* ========================= */}
-        {/* 🪪 IDENTIDADE (HERO) */}
-        {/* ========================= */}
-
-        <div className="h-[60vh] flex items-center">
-
-        <div className="w-full flex rounded-2xl border border-white/40 bg-white/5 backdrop-blur-sm shadow-[0_0_40px_rgba(255,255,255,0.05)] overflow-hidden">
-
-            {/* FOTO */}
-            <div className="flex items-center justify-center border-r border-white/20 px-4">
-
-            <div className="aspect-square h-[60%] bg-black">
-                {character.imagem_perfil ? (
-                <img
-                    src={character.imagem_perfil}
-                    className="w-full h-full object-cover"
-                />
-                ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">
-                    SEM IMAGEM
-                </div>
-                )}
-            </div>
-
-            </div>
-
-            {/* CONTEÚDO */}
-            <div className="flex-1 px-8 py-6 flex flex-col justify-between">
-
-            {/* NOME */}
-            <div>
-                <p className="text-sm tracking-[0.4em] text-gray-400 uppercase">
-                Agente
-                </p>
-
-                <h1 className="text-4xl font-bold tracking-wide mt-2">
-                {character.name}
-                </h1>
-            </div>
-
-            {/* DADOS */}
-            <div className="grid grid-cols-2 gap-x-10 gap-y-3 text-sm text-gray-300 mt-6">
-
-                <p>Idade: {character.idade || "-"}</p>
-                <p>Jogador: {character.user_name || "-"}</p>
-
-                <p>Classe: {character.classe || "-"}</p>
-                <p>Trilha: {character.trilha || "-"}</p>
-
-                <p>Origem: {character.origem || "-"}</p>
-                <p>Patente: {character.patente || "-"}</p>
-
-                <p>Nível: {character.nivel || "-"}</p>
-                <p>NEX: {character.nex}%</p>
-
-                <p>Afinidade: {character.afinidade || "-"}</p>
-
-            </div>
-
-            </div>
-
-            {/* TOKEN */}
-            <div className="h-full aspect-[2/3] border-l border-white/20 bg-black flex-shrink-0">
-            {character.imagem_token ? (
-                <img
-                src={character.imagem_token}
-                className="w-full h-full object-cover"
-                />
-            ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">
-                TOKEN
-                </div>
-            )}
-            </div>
-
+          <div>
+            <button
+              onClick={() => router.push("/dashboard")}
+              className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
+            >
+              Voltar
+            </button>
+          </div>
         </div>
-
-        </div>
-
-      {/* ========================= */}
-      {/* 📊 CORPO (3 COLUNAS) */}
-      {/* ========================= */}
-
-      <div className="grid grid-cols-3 gap-6 mt-6">
-
-        {/* ================= */}
-        {/* COLUNA 1 */}
-        {/* ================= */}
-        <div className="space-y-4">
-
-          {/* VIDA */}
-          <div className="border p-3">
-            <p className="text-sm">VIDA</p>
-            <p>{character.vida_atual}/{character.vida_max} (+{character.vida_temp})</p>
-            <div className="h-2 bg-gray-800 mt-2">
-              <div
-                className="h-full bg-red-500"
-                style={{ width: `${percent(character.vida_atual, character.vida_max)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* PE */}
-          <div className="border p-3">
-            <p className="text-sm">ESFORÇO</p>
-            <p>{character.esforco_atual}/{character.esforco_max} (+{character.esforco_temp})</p>
-            <div className="h-2 bg-gray-800 mt-2">
-              <div
-                className="h-full bg-yellow-400"
-                style={{ width: `${percent(character.esforco_atual, character.esforco_max)}%` }}
-              />
-            </div>
-          </div>
-
-          {/* SANIDADE */}
-          <div className="border p-3">
-            <p className="text-sm">SANIDADE</p>
-            <p>{character.sanidade_atual}/{character.sanidade_max}</p>
-            <div className="h-2 bg-gray-800 mt-2">
-              <div
-                className="h-full bg-blue-400"
-                style={{ width: `${percent(character.sanidade_atual, character.sanidade_max)}%` }}
-              />
-            </div>
-          </div>
-
-        </div>
-
-        {/* ================= */}
-        {/* COLUNA 2 */}
-        {/* ================= */}
-        <div className="space-y-4">
-
-          {/* ESTADOS */}
-          <div className="border p-3">
-            <p>Morrendo: {character.morrendo}/3</p>
-            <p>Enlouquecendo: {character.enlouquecendo}/3</p>
-          </div>
-
-          {/* DEFESAS */}
-          <div className="border p-3">
-            <p>Defesa: {character.defesa || 0}</p>
-            <p>Esquiva: {character.esquiva || 0}</p>
-            <p>Bloqueio: {character.bloqueio || 0}</p>
-          </div>
-
-          {/* OUTROS */}
-          <div className="border p-3 flex justify-between">
-            <div>
-              <p className="text-xs">Limite PE</p>
-              <p>{character.limite_pe || 1}</p>
-            </div>
-            <div>
-              <p className="text-xs">Deslocamento</p>
-              <p>{character.deslocamento_atual}/{character.deslocamento_max}</p>
-            </div>
-          </div>
-
-        </div>
-
-        {/* ================= */}
-        {/* COLUNA 3 */}
-        {/* ================= */}
-        <div className="border p-3 flex items-center justify-center">
-
-          <div className="text-center">
-            <p className="text-xs mb-2">ATRIBUTOS</p>
-
-            <div className="grid grid-cols-3 gap-2 text-sm">
-              <p>FOR {attributes.forca}</p>
-              <p>AGI {attributes.agilidade}</p>
-              <p>INT {attributes.intelecto}</p>
-              <p>VIG {attributes.vigor}</p>
-              <p>PRE {attributes.presenca}</p>
-            </div>
-
-            <p className="text-[10px] text-gray-500 mt-3">
-              (pentágono visual depois)
-            </p>
-          </div>
-
-        </div>
-
       </div>
 
+      <main>
+        <div className="card flex flex-col md:flex-row overflow-hidden bg-white/3 rounded-lg">
+          {/* Left: large square photo */}
+          <div className="w-full md:w-1/3 flex-shrink-0 bg-[#021018] flex items-center justify-center">
+            <div className="w-full max-w-[420px] aspect-square">
+              {character.imagem_perfil ? (
+                <img src={character.imagem_perfil} alt={character.name} className="w-full h-full object-cover rounded-t-lg md:rounded-l-lg" />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">SEM IMAGEM</div>
+              )}
+            </div>
+          </div>
+
+          {/* Right: name title and two-block layout (info | token) */}
+          <div className="flex-1 p-6">
+            <h3 className="text-2xl font-bold mb-4">Nome do Agente: {character.name}</h3>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {/* Left block: other info (spans 2 columns on md) */}
+              <div className="md:col-span-2 bg-transparent">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <p className="text-gray-400 text-xs">Idade</p>
+                    <p>{character.idade || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-400 text-xs">Origem</p>
+                    <p>{character.origem || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-400 text-xs">Classe</p>
+                    <p>{character.classe || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-400 text-xs">Trilha</p>
+                    <p>{character.trilha || "-"}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-400 text-xs">Nível</p>
+                    <p>{character.nivel || 0}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-400 text-xs">NEX</p>
+                    <p>{character.nex || 0}%</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-400 text-xs">Prestígio</p>
+                    <p>{character.prestigio || 0}</p>
+                  </div>
+
+                  <div>
+                    <p className="text-gray-400 text-xs">Patente</p>
+                    <p>{getPatente(character.prestigio)}</p>
+                  </div>
+
+                  <div className="col-span-2">
+                    <p className="text-gray-400 text-xs">Afinidade</p>
+                    <p>{character.afinidade || "-"}</p>
+                  </div>
+
+                      <div className="col-span-2">
+                        <p className="text-gray-400 text-xs">Jogador</p>
+                        <p>{currentUserName || character.user_name || "-"}</p>
+                      </div>
+                </div>
+              </div>
+
+              {/* Right block: token image */}
+              <div className="flex items-center justify-center">
+                <div className="w-full max-w-[220px] aspect-[2/3] border border-white/10 bg-[#021018]">
+                  {character.imagem_token ? (
+                    <img src={character.imagem_token} alt="token" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">TOKEN</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
     </div>
   );
 }

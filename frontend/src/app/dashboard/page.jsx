@@ -2,11 +2,28 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import CharacterCard from "../../components/CharacterCard";
 
 export default function Dashboard() {
   const [characters, setCharacters] = useState([]);
-  const [status, setStatus] = useState("> carregando dados...");
+  const [status, setStatus] = useState("");
+  const [userName, setUserName] = useState("");
+  const [accountOpen, setAccountOpen] = useState(false);
   const router = useRouter();
+
+  const decodeTokenName = () => {
+    const token = localStorage.getItem("token");
+    if (!token) return "";
+
+    try {
+      const parts = token.split('.');
+      if (parts.length < 2) return "";
+      const payload = JSON.parse(atob(parts[1]));
+      return payload.name || payload.email || "Usuário";
+    } catch (e) {
+      return "";
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem("token");
@@ -14,6 +31,27 @@ export default function Dashboard() {
   };
 
   useEffect(() => {
+    // prefer fetching current user from backend to get canonical name
+    (async () => {
+      const token = localStorage.getItem("token");
+      if (!token) return setUserName(decodeTokenName());
+
+      try {
+        const res = await fetch("http://localhost:3001/auth/me", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          setUserName(data.name || data.email || decodeTokenName());
+        } else {
+          setUserName(decodeTokenName());
+        }
+      } catch (e) {
+        setUserName(decodeTokenName());
+      }
+    })();
+
     const fetchCharacters = async () => {
       const token = localStorage.getItem("token");
 
@@ -21,6 +59,8 @@ export default function Dashboard() {
         router.push("/");
         return;
       }
+
+      setStatus("> carregando fichas...");
 
       try {
         const res = await fetch("http://localhost:3001/characters", {
@@ -36,7 +76,7 @@ export default function Dashboard() {
           return;
         }
 
-        setCharacters(data);
+        setCharacters(data || []);
         setStatus("");
       } catch (err) {
         setStatus("> erro de conexão");
@@ -46,113 +86,52 @@ export default function Dashboard() {
     fetchCharacters();
   }, []);
 
+  // Patente logic moved into CharacterCard component
+
   return (
-    <div className="min-h-screen bg-black text-white p-8">
+  <div className="p-6 min-h-0 depth-glow">
 
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-10">
-
-        <div>
-          <h1 className="text-2xl tracking-[0.3em]">FICHA OPRPG</h1>
-          <p className="text-red-500 text-sm">ARQUIVOS CONFIDENCIAIS</p>
-        </div>
-
-        {/* CONTA */}
-        <div className="text-right">
-          <p className="text-xs text-gray-400 mb-2">AGENTE LOGADO</p>
-          <button
-            onClick={handleLogout}
-            className="border border-red-500 px-3 py-1 text-xs hover:bg-red-500 hover:text-black transition"
-          >
-            ENCERRAR SESSÃO
-          </button>
-        </div>
-
-      </div>
-
-      {/* STATUS */}
-      {status && (
-        <p className="text-green-400 font-mono mb-6">{status}</p>
-      )}
-
-      {/* LISTA */}
-      <div className="flex flex-col items-left gap-6">
-
-        {characters.map((char) => (
-          <div
-            key={char.id}
-            onClick={() => router.push(`/character/${char.id}`)}
-            className="cursor-pointer flex w-full max-w-xl border border-white/20 bg-white/5 hover:border-red-500 hover:scale-[1.01] transition-all duration-200 shadow-[0_0_20px_rgba(255,0,0,0.1)]"
-          >
-
-            {/* FOTO */}
-            <div className="w-40 h-40 bg-black border-r border-white/10">
-              {char.imagem_perfil ? (
-                <img
-                  src={char.imagem_perfil}
-                  alt="personagem"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">
-                  SEM IMAGEM
-                </div>
-              )}
-            </div>
-
-            {/* DADOS */}
-            <div className="flex-1 p-4 flex flex-col justify-between">
-
-              {/* topo */}
-              <div>
-                <h2 className="text-lg tracking-wide">{char.name}</h2>
-
-                <p className="text-sm text-gray-400">
-                  {char.classe || "Classe desconhecida"}
-                </p>
-
-                <p className="text-xs text-gray-500">
-                  Origem: {char.origem || "-"}
-                </p>
-              </div>
-
-              {/* meio */}
-              <div className="flex gap-6 text-xs mt-3">
-
-                <div>
-                  <p className="text-gray-500">NEX</p>
-                  <p className="text-red-400">{char.nex}%</p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500">VIDA</p>
-                  <p>{char.vida_atual}/{char.vida_max}</p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500">SAN</p>
-                  <p>{char.sanidade_atual}/{char.sanidade_max}</p>
-                </div>
-
-                <div>
-                  <p className="text-gray-500">PE</p>
-                  <p>{char.esforco_atual}/{char.esforco_max}</p>
-                </div>
-
-              </div>
-
-              {/* rodapé */}
-              <div className="text-[10px] text-gray-500 mt-2">
-                Clique para acessar ficha completa
-              </div>
-
-            </div>
-
+      <main>
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg">Suas fichas</h2>
+          <div>
+            <button
+              onClick={() => router.push('/character/new')}
+              className="border border-green-500 text-green-500 text-sm px-3 py-1 rounded flex items-center gap-2 hover:bg-green-500/10 transition"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              <span>Nova ficha</span>
+            </button>
           </div>
-        ))}
+        </div>
 
-      </div>
+        {status && <p className="text-green-400 font-mono mb-4">{status}</p>}
 
+        {characters.length === 0 ? (
+          <div className="p-6 border border-white/10 rounded bg-white/3 text-center">
+            <p className="mb-2">Você ainda não possui fichas.</p>
+            <button
+              onClick={() => router.push('/character/new')}
+              className="mt-2 border border-green-500 text-green-500 px-3 py-1 text-sm rounded hover:bg-green-500/10"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="inline h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Criar primeira ficha
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {characters.map((char) => (
+              <CharacterCard key={char.id} character={char} currentUserName={userName} />
+            ))}
+          </div>
+        )}
+      </main>
+
+      
     </div>
   );
 }
