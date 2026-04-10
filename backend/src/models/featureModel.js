@@ -25,7 +25,10 @@ const FeatureModel = {
       // 🔥 parse do JSON
       const parsed = results.map(f => ({
         ...f,
-        metadata: f.metadata ? JSON.parse(f.metadata) : {}
+        metadata:
+          typeof f.metadata === "string"
+            ? JSON.parse(f.metadata)
+            : f.metadata || {}
       }));
 
       callback(null, parsed);
@@ -65,7 +68,10 @@ const FeatureModel = {
       // 🔥 parse metadata
       const parsed = results.map(f => ({
         ...f,
-        metadata: f.metadata ? JSON.parse(f.metadata) : {}
+        metadata:
+          typeof f.metadata === "string"
+            ? JSON.parse(f.metadata)
+            : f.metadata || {}
       }));
 
       callback(null, parsed);
