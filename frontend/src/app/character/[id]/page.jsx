@@ -2,6 +2,9 @@
 
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+import FichaPaper from "../../../components/FichaPaper";
+import StatsPanel from "../../../components/StatsPanel";
 
 export default function CharacterPage() {
   const params = useParams();
@@ -185,6 +188,11 @@ export default function CharacterPage() {
           </div>
         </div>
       </main>
+
+      {/* Segunda parte da ficha: papel com sidebar e estatísticas */}
+      <FichaPaper>
+        <StatsPanel character={character} />
+      </FichaPaper>
     </div>
   );
 }

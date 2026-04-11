@@ -113,3 +113,94 @@ body {
 /* Surface background helper */
 .surface-block { background: var(--surface); color: var(--foreground); }
 
+/* Ficha (paper) styles */
+.ficha-paper {
+  width: 90vw;
+  max-width: 1400px;
+  margin: 3rem auto;
+  background: rgba(3,12,16,0.85); /* a bit darker than page background */
+  border-radius: 8px;
+  position: relative;
+  padding: 1.25rem;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6), 0 0 40px rgba(0,0,0,0.5);
+  overflow: hidden;
+}
+
+.ficha-paper .ficha-inner { display: flex; gap: 1rem; align-items: flex-start; }
+
+/* dotted sidebar that simulates a paper edge with glow */
+.ficha-sidebar {
+  width: 14px;
+  flex: 0 0 14px;
+  position: relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+/* dotted white sidebar using radial pattern to look like punched edge */
+.ficha-sidebar::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+  width: 6px;
+  height: 90%;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.95) 1px, transparent 1px);
+  background-size: 6px 16px;
+  opacity: 0.95;
+  filter: blur(0.2px);
+}
+/* glow overlay to simulate that this piece is above the background */
+.ficha-sidebar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+  width: 28px;
+  height: 140%;
+  background: linear-gradient(90deg, rgba(255,255,255,0.06), transparent 60%);
+  filter: blur(12px);
+  opacity: 0.14;
+  pointer-events: none;
+}
+
+/* inner content area resembling a sheet */
+.ficha-sheet {
+  flex: 1 1 auto;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(180deg, rgba(255,255,255,0.01), rgba(0,0,0,0.02));
+  border-radius: 4px;
+}
+
+.ficha-sheet .section-separator { margin-left: 1rem; }
+
+/* stats rows */
+.stats-row { display:flex; flex-direction:column; gap:8px; margin-bottom:14px; }
+.stats-row .values { display:flex; gap:10px; align-items:center; }
+.stat-box { background: rgba(255,255,255,0.03); padding:8px 10px; border-radius:8px; min-width:72px; text-align:center; border:1px solid rgba(255,255,255,0.03); }
+.stat-input { background: transparent; border: none; color: var(--foreground); width:72px; text-align:center; outline: none; font-weight:600; }
+.stat-input:focus { box-shadow: 0 0 0 3px rgba(255,255,255,0.04); border-radius:6px; }
+
+.stat-label { font-size:0.85rem; color:rgba(255,255,255,0.75); }
+
+.bar-bg { width:100%; height:10px; border-radius:999px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:999px; }
+.bar-red { background: linear-gradient(90deg,#ff5a5a,#ff2c2c); }
+.bar-yellow { background: linear-gradient(90deg,#ffd25a,#ffb32c); }
+.bar-blue { background: linear-gradient(90deg,#6ea8ff,#2b8df2); }
+
+/* Dark tonal backgrounds for bars (same hue, much darker) */
+.bar-bg-red { background: linear-gradient(90deg, rgba(60,6,6,0.7), rgba(30,4,4,0.7)); }
+.bar-bg-yellow { background: linear-gradient(90deg, rgba(60,50,6,0.7), rgba(40,34,6,0.7)); }
+.bar-bg-blue { background: linear-gradient(90deg, rgba(6,30,60,0.7), rgba(3,18,40,0.7)); }
+
+/* responsive adjustments */
+@media (max-width: 900px) {
+  .ficha-paper { width: 95vw; padding: 0.75rem; }
+  .ficha-sidebar { display:none; }
+  .stat-input { width:58px; }
+}
+
+
