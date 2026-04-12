@@ -4,7 +4,11 @@ import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import FichaPaper from "../../../components/FichaPaper";
-import StatsPanel from "../../../components/StatsPanel";
+import StatusSection from "../../../components/StatusSection";
+import CharacterStates from "../../../components/CharacterStates";
+import CharacterAttributes from "../../../components/CharacterAttributes";
+import ProtectionsPanel from "../../../components/ProtectionsPanel";
+import PericiasPanel from "../../../components/PericiasPanel";
 
 export default function CharacterPage() {
   const params = useParams();
@@ -12,6 +16,8 @@ export default function CharacterPage() {
   const { id } = params || {};
 
   const [character, setCharacter] = useState(null);
+  const [attributes, setAttributes] = useState({});
+  const [protections, setProtections] = useState([]);
   const [status, setStatus] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
 
@@ -48,6 +54,8 @@ export default function CharacterPage() {
         const data = await res.json();
         // backend returns { character, attributes, features }
         setCharacter(data.character || data);
+        setAttributes(data.attributes || {});
+        setProtections(data.protections || []);
         setStatus("");
       } catch (err) {
         setStatus("> erro de conexão");
@@ -189,9 +197,34 @@ export default function CharacterPage() {
         </div>
       </main>
 
-      {/* Segunda parte da ficha: papel com sidebar e estatísticas */}
+      {/* Segunda parte da ficha: papel com três colunas (Status | Dados | Extras) */}
       <FichaPaper>
-        <StatsPanel character={character} />
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
+          <div className="md:col-span-2 pr-4 md:pr-8 md:border-r md:border-white/6">
+            <StatusSection character={character} />
+          </div>
+
+          <div className="md:col-span-2">
+            <CharacterStates character={character} />
+          </div>
+
+            <div className="md:col-span-2">
+            <CharacterAttributes character={character} attributes={attributes} />
+          </div>
+        </div>
+      </FichaPaper>
+
+      {/* Terceira parte da ficha: Proteções/Resistências (3/6) + Perícias (3/6) */}
+      <FichaPaper>
+        <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
+            <div className="md:col-span-3">
+            <ProtectionsPanel character={character} attributes={attributes} protections={protections} onCharacterUpdate={setCharacter} />
+          </div>
+
+          <div className="md:col-span-3">
+            <PericiasPanel character={character} attributes={attributes} />
+          </div>
+        </div>
       </FichaPaper>
     </div>
   );

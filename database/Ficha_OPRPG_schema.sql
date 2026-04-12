@@ -118,8 +118,41 @@ CREATE TABLE resistances (
     id INT AUTO_INCREMENT PRIMARY KEY,
     character_id INT NOT NULL,
 
-    type VARCHAR(50),
-    value INT DEFAULT 0,
+    acid INT DEFAULT 0,
+    balistico INT DEFAULT 0,
+    corte INT DEFAULT 0,
+    eletricidade INT DEFAULT 0,
+    fogo INT DEFAULT 0,
+    frio INT DEFAULT 0,
+    impacto INT DEFAULT 0,
+    mental INT DEFAULT 0,
+    perfuracao INT DEFAULT 0,
+    veneno INT DEFAULT 0,
+    conhecimento INT DEFAULT 0,
+    energia INT DEFAULT 0,
+    sangue INT DEFAULT 0,
+    morte INT DEFAULT 0,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+-- Protections (armor/equipment that provide passive defense and resistances)
+CREATE TABLE protections (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    character_id INT NOT NULL,
+
+    equipped TINYINT(1) DEFAULT 0,
+    name VARCHAR(150) NOT NULL,
+    passive_defense INT DEFAULT 0,
+    damage_resistance INT DEFAULT 0,
+    encumbrance_penalty INT DEFAULT 0,
+    notes TEXT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
@@ -195,3 +228,19 @@ ADD deslocamento_max INT DEFAULT 0,
 -- IMAGENS
 ADD imagem_perfil TEXT,
 ADD imagem_token TEXT;
+
+-- Adiciona campos de defesa passiva, esquiva e bloqueio à tabela characters
+ALTER TABLE characters
+    ADD COLUMN defesa_passiva INT DEFAULT 0,
+    ADD COLUMN esquiva INT DEFAULT 0,
+    ADD COLUMN bloqueio INT DEFAULT 0;
+
+-- Trigger: whenever a character is created, insert a default resistances row (all zeros)
+DELIMITER //
+CREATE TRIGGER trg_after_insert_character_resistances
+AFTER INSERT ON characters
+FOR EACH ROW
+BEGIN
+    INSERT INTO resistances (character_id) VALUES (NEW.id);
+END;//
+DELIMITER ;

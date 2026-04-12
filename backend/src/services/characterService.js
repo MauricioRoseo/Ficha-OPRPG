@@ -55,15 +55,55 @@ const CharacterService = {
         FeatureService.getCharacterFeaturesGrouped(characterId, (err3, features) => {
           if (err3) return callback(err3);
 
-          callback(null, {
-            character,
-            attributes: attributes[0] || {},
-            features
+          // 🔒 protections
+          const ProtectionModel = require('../models/protectionModel');
+          ProtectionModel.findByCharacterId(characterId, (err4, protections) => {
+            if (err4) return callback(err4);
+
+            callback(null, {
+              character,
+              attributes: attributes[0] || {},
+              features,
+              protections: protections || []
+            });
           });
         });
       });
     });
   }
+
+    ,
+
+    updateCharacter: (characterId, userId, data, callback) => {
+      // valida dono antes de atualizar
+      const CharacterModel = require('../models/characterModel');
+
+      CharacterModel.findById(characterId, (err, character) => {
+        if (err) return callback(err);
+        if (!character) return callback({ message: 'Personagem não encontrado' });
+
+        if (character.user_id !== userId) return callback({ message: 'Acesso negado' });
+
+        // atualiza campos permitidos
+        const payload = {
+          vida_atual: data.vida_atual,
+          vida_temp: data.vida_temp,
+          esforco_atual: data.esforco_atual,
+          esforco_temp: data.esforco_temp,
+          sanidade_atual: data.sanidade_atual,
+          defesa_passiva: data.defesa_passiva,
+          esquiva: data.esquiva,
+          bloqueio: data.bloqueio,
+          morrendo: data.morrendo,
+          enlouquecendo: data.enlouquecendo,
+        };
+
+        CharacterModel.update(characterId, payload, (err2) => {
+          if (err2) return callback(err2);
+          callback(null, { message: 'Status atualizados' });
+        });
+      });
+    }
 };
 
 module.exports = CharacterService;

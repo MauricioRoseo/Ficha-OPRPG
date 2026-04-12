@@ -10,6 +10,8 @@ const CharacterModel = {
         sanidade_atual, sanidade_max,
         esforco_atual, esforco_max, esforco_temp,
 
+        defesa_passiva, esquiva, bloqueio,
+
         prestigio,
         morrendo, enlouquecendo,
 
@@ -17,7 +19,7 @@ const CharacterModel = {
 
         imagem_perfil, imagem_token
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -40,6 +42,10 @@ const CharacterModel = {
       data.esforco_atual || 0,
       data.esforco_max || 0,
       data.esforco_temp || 0,
+
+      data.defesa_passiva || 0,
+      data.esquiva || 0,
+      data.bloqueio || 0,
 
       data.prestigio || 0,
 
@@ -75,4 +81,44 @@ const CharacterModel = {
 }
 };
 
+// atualiza campos de status (vida, esforço, sanidade)
+CharacterModel.update = (id, data, callback) => {
+  const sql = `
+    UPDATE characters SET
+      vida_atual = ?,
+      vida_temp = ?,
+      esforco_atual = ?,
+      esforco_temp = ?,
+      sanidade_atual = ?,
+      defesa_passiva = ?,
+      esquiva = ?,
+      bloqueio = ?,
+      morrendo = ?,
+      enlouquecendo = ?
+    WHERE id = ?
+  `;
+
+  const values = [
+    data.vida_atual || 0,
+    data.vida_temp || 0,
+    data.esforco_atual || 0,
+    data.esforco_temp || 0,
+    data.sanidade_atual || 0,
+    data.defesa_passiva || 0,
+    data.esquiva || 0,
+    data.bloqueio || 0,
+    data.morrendo || 0,
+    data.enlouquecendo || 0,
+    id,
+  ];
+
+  db.query(sql, values, callback);
+};
+
 module.exports = CharacterModel;
+
+// set only passive defense value for a character
+CharacterModel.setPassiveDefense = (id, value, callback) => {
+  const sql = `UPDATE characters SET defesa_passiva = ? WHERE id = ?`;
+  db.query(sql, [value || 0, id], callback);
+};

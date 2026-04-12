@@ -44,6 +44,22 @@ const CharacterController = {
       res.json(result);
     });
   }
+,
+
+  update: (req, res) => {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const data = req.body;
+
+    CharacterService.updateCharacter(id, userId, data, (err, result) => {
+      if (err) {
+        if (err.message === 'Acesso negado') return res.status(403).json(err);
+        return res.status(500).json(err);
+      }
+
+      res.json(result);
+    });
+  }
 };
 
 module.exports = CharacterController;
