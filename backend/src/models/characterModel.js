@@ -19,7 +19,7 @@ const CharacterModel = {
 
         imagem_perfil, imagem_token
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
@@ -48,6 +48,7 @@ const CharacterModel = {
       data.bloqueio || 0,
 
       data.prestigio || 0,
+        data.patente || null,
 
       data.morrendo || 0,
       data.enlouquecendo || 0,
@@ -94,7 +95,8 @@ CharacterModel.update = (id, data, callback) => {
       esquiva = ?,
       bloqueio = ?,
       morrendo = ?,
-      enlouquecendo = ?
+      enlouquecendo = ?,
+      patrimonio = ?
     WHERE id = ?
   `;
 
@@ -109,10 +111,17 @@ CharacterModel.update = (id, data, callback) => {
     data.bloqueio || 0,
     data.morrendo || 0,
     data.enlouquecendo || 0,
+    (data.patrimonio !== undefined ? data.patrimonio : null),
     id,
   ];
 
   db.query(sql, values, callback);
+};
+
+// update proficiencies text field
+CharacterModel.updateProficiencies = (id, proficiencies, prestigio, patente, callback) => {
+  const sql = `UPDATE characters SET proficiencias = ?, prestigio = ?, patente = ? WHERE id = ?`;
+  db.query(sql, [proficiencies || null, prestigio || 0, patente || null, id], callback);
 };
 
 module.exports = CharacterModel;
@@ -121,4 +130,10 @@ module.exports = CharacterModel;
 CharacterModel.setPassiveDefense = (id, value, callback) => {
   const sql = `UPDATE characters SET defesa_passiva = ? WHERE id = ?`;
   db.query(sql, [value || 0, id], callback);
+};
+
+// set current and max carga for a character
+CharacterModel.setCarga = (id, cargaAtual, cargaMaxima, callback) => {
+  const sql = `UPDATE characters SET carga_atual = ?, carga_maxima = ? WHERE id = ?`;
+  db.query(sql, [cargaAtual || 0, cargaMaxima || 0, id], callback);
 };

@@ -62,15 +62,30 @@ const CharacterService = {
 
                   // resistances
                   const ResistanceModel = require('../models/resistanceModel');
+                  const InventoryModel = require('../models/inventoryModel');
                   ResistanceModel.findByCharacterId(characterId, (err5, resistances) => {
                     if (err5) return callback(err5);
 
-                    callback(null, {
-                      character,
-                      attributes: attributes[0] || {},
-                      features,
-                      protections: protections || [],
-                      resistances: resistances || {}
+                    // fetch inventory and compute carga fields
+                    InventoryModel.findByCharacterId(characterId, (err6, items) => {
+                      if (err6) return callback(err6);
+                      const inventory = items || [];
+                      const cargaAtual = inventory.reduce((acc, it) => acc + (Number(it.space) || 0), 0);
+                      const attr = attributes[0] || { forca: 0 };
+                      const cargaMaxima = (Number(attr.forca) > 0) ? (Number(attr.forca) * 5) : 2;
+
+                      // ensure character object contains carga values (from DB or computed)
+                      character.carga_atual = cargaAtual;
+                      character.carga_maxima = cargaMaxima;
+
+                      callback(null, {
+                        character,
+                        attributes: attributes[0] || {},
+                        features,
+                        protections: protections || [],
+                        resistances: resistances || {},
+                        inventory: inventory
+                      });
                     });
                   });
           });
@@ -103,11 +118,42 @@ const CharacterService = {
           bloqueio: data.bloqueio,
           morrendo: data.morrendo,
           enlouquecendo: data.enlouquecendo,
+          proficiencias: data.proficiencias,
+          patrimonio: data.patrimonio
         };
 
         CharacterModel.update(characterId, payload, (err2) => {
           if (err2) return callback(err2);
-          callback(null, { message: 'Status atualizados' });
+          // if proficiencies provided, update separately
+          if (data.proficiencias !== undefined) {
+            // parse prestigio from first line if present
+            let prestigio = 0;
+            try {
+              const lines = (data.proficiencias || '').split(/\r?\n/);
+              if (lines[0] && /\d+/.test(lines[0])) {
+                const m = lines[0].match(/(\d+)/);
+                if (m) prestigio = Number(m[1]);
+              }
+            } catch (e) { prestigio = 0; }
+
+            // compute patente based on prestigio following business rules
+            const computePatente = (p) => {
+              if (p >= 200) return 'Agente de Elite';
+              if (p >= 100) return 'Oficial de Operações';
+              if (p >= 50) return 'Agente Especial';
+              if (p >= 20) return 'Operador';
+              return 'Recruta';
+            };
+
+            const patente = computePatente(prestigio);
+
+            CharacterModel.updateProficiencies(characterId, data.proficiencias, prestigio, patente, (err3) => {
+              if (err3) return callback(err3);
+              callback(null, { message: 'Status e proficiências atualizados', prestigio, patente });
+            });
+          } else {
+            callback(null, { message: 'Status atualizados' });
+          }
         });
       });
     }

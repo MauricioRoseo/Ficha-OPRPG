@@ -16,6 +16,9 @@ router.post('/from-template', authMiddleware, ProtectionController.createFromTem
 // update partial protection (e.g., toggle equipped)
 router.put('/:id', authMiddleware, ProtectionController.update);
 
+// delete protection
+router.delete('/:id', authMiddleware, ProtectionController.remove);
+
 // create protection
 router.post('/', authMiddleware, ProtectionController.create);
 

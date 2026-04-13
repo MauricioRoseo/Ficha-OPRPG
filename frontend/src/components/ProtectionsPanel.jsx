@@ -52,6 +52,17 @@ export default function ProtectionsPanel({ character, attributes, protections: i
     setShowAddModal(false);
   };
 
+  const handleDelete = async (id) => {
+    if (!confirm('Remover proteção?')) return;
+    try {
+      const res = await fetch(`http://localhost:3001/protections/${id}`, { method: 'DELETE', headers: { Authorization: token ? `Bearer ${token}` : '' } });
+      if (!res.ok) throw new Error('Erro ao remover proteção');
+      setProtections(prev => prev.filter(p => p.id !== id));
+    } catch (e) {
+      console.error(e); alert('Erro ao remover');
+    }
+  };
+
   return (
     <div>
       <div className="mb-3 stat-label">Proteções & Resistências</div>
@@ -77,6 +88,7 @@ export default function ProtectionsPanel({ character, attributes, protections: i
                   <th className="w-24">Def. Pass.</th>
                   <th className="w-24">Resist.</th>
                   <th className="w-24">Penal.</th>
+                  <th className="w-12" />
                 </tr>
               </thead>
               <tbody>
@@ -89,6 +101,11 @@ export default function ProtectionsPanel({ character, attributes, protections: i
                     <td className="py-2">{p.passive_defense ?? 0}</td>
                     <td className="py-2">{p.damage_resistance ?? 0}</td>
                     <td className="py-2">{p.encumbrance_penalty ?? 0}</td>
+                    <td className="py-2 text-right">
+                      <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-500" title="Remover">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>

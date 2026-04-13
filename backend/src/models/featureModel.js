@@ -4,14 +4,15 @@ const FeatureModel = {
 
   create: (data, callback) => {
     const sql = `
-      INSERT INTO features (name, type, description, metadata, has_encumbrance_penalty, encumbrance_penalty)
-      VALUES (?, ?, ?, ?, ?, ?)
+      INSERT INTO features (name, type, description, origin, metadata, has_encumbrance_penalty, encumbrance_penalty)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
       data.name,
       data.type,
       data.description || null,
+      data.origin || null,
       JSON.stringify(data.metadata || {}),
       data.has_encumbrance_penalty ? 1 : 0,
       (data.has_encumbrance_penalty ? (data.encumbrance_penalty || 0) : null)
@@ -84,7 +85,7 @@ const FeatureModel = {
 
   getByCharacter: (characterId, callback) => {
     const sql = `
-      SELECT cf.*, f.name AS feature_name, f.type, f.description AS feature_description, f.metadata AS feature_metadata, f.has_encumbrance_penalty, f.encumbrance_penalty AS feature_encumbrance
+      SELECT cf.*, f.name AS feature_name, f.type, f.description AS feature_description, f.origin AS feature_origin, f.metadata AS feature_metadata, f.has_encumbrance_penalty, f.encumbrance_penalty AS feature_encumbrance
       FROM character_features cf
       LEFT JOIN features f ON cf.feature_id = f.id
       WHERE cf.character_id = ?
@@ -113,6 +114,7 @@ const FeatureModel = {
           name: row.template_name || row.feature_name,
           type: row.type,
           description: row.template_description || row.feature_description,
+          origin: row.template_metadata && (row.template_metadata.origin || row.template_metadata.source) ? (row.template_metadata.origin || row.template_metadata.source) : (row.feature_origin || null),
           metadata: templateMeta || featureMeta || {},
           template_id: row.template_id || null
         };
@@ -120,6 +122,13 @@ const FeatureModel = {
 
       callback(null, parsed);
     });
+  }
+
+  ,
+
+  removeCharacterFeature: (id, callback) => {
+    const sql = `DELETE FROM character_features WHERE id = ?`;
+    db.query(sql, [id], callback);
   }
 
 };

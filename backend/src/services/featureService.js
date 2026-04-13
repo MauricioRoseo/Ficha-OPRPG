@@ -37,6 +37,28 @@ const FeatureService = {
     });
   },
 
+  removeFeatureFromCharacter: (characterId, charFeatureId, userId, callback) => {
+    // verify character ownership then delete the character_feature row
+    const CharacterModel = require('../models/characterModel');
+    CharacterModel.findById(characterId, (err, character) => {
+      if (err) return callback(err);
+      if (!character) return callback(new Error('Personagem não encontrado'));
+      if (character.user_id !== userId) return callback(new Error('Acesso negado'));
+
+      // ensure the feature belongs to this character
+      FeatureModel.getByCharacter(characterId, (err2, features) => {
+        if (err2) return callback(err2);
+        const found = features.find(f => String(f.id) === String(charFeatureId));
+        if (!found) return callback(new Error('Perícia não encontrada neste personagem'));
+
+        FeatureModel.removeCharacterFeature(charFeatureId, (err3, result) => {
+          if (err3) return callback(err3);
+          callback(null, result);
+        });
+      });
+    });
+  },
+
   // 🔥 versão com metadata + cálculo
   getCharacterFeaturesGrouped: (characterId, callback) => {
     FeatureModel.getByCharacter(characterId, (err, results) => {
@@ -61,14 +83,17 @@ const FeatureService = {
         if (f.type === 'pericia') {
           const atributo = f.metadata?.atributo || null;
 
+          // Ordem Paranormal: o atributo base não soma no total da perícia;
+          // ele apenas determina quais dados rolar. Portanto o total da perícia
+          // é composto apenas pelo bônus de treinamento e bônus extra.
           const total =
-            (f.value || 0) +
             (trainingBonus[f.training_level] || 0) +
             (f.extra || 0);
 
           grouped[f.type].push({
             id: f.id,
             name: f.name,
+            description: f.description || '',
             atributo,
             total,
             training_level: f.training_level,

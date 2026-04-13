@@ -110,6 +110,20 @@ const seed = async () => {
     await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c3, 1, 2, 5, 1, 2]);
     await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c4, 2, 2, 3, 3, 4]);
 
+    // criar guias padrão para cada personagem (ficha, antecedente, notas)
+    const createTabs = async (charId) => {
+      const exists = await query(`SELECT id FROM character_tabs WHERE character_id = ?`, [charId]);
+      if (exists && exists.length > 0) return;
+      await query(`INSERT INTO character_tabs (character_id, tab_key, title, position, visible) VALUES (?, ?, ?, ?, ?)`, [charId, 'ficha', 'Ficha', 1, 1]);
+      await query(`INSERT INTO character_tabs (character_id, tab_key, title, position, visible) VALUES (?, ?, ?, ?, ?)`, [charId, 'antecedente', 'Antecedente', 2, 1]);
+      await query(`INSERT INTO character_tabs (character_id, tab_key, title, position, visible) VALUES (?, ?, ?, ?, ?)`, [charId, 'notas', 'Notas', 3, 1]);
+    };
+
+    await createTabs(c1);
+    await createTabs(c2);
+    await createTabs(c3);
+    await createTabs(c4);
+
     console.log('✔ Atributos criados para personagens de exemplo');
 
     // buscar features base
@@ -192,6 +206,26 @@ const seed = async () => {
     const c6 = await createCharacter(u3, { name: 'Engenheiro K', classe: 'Technician', nex: 40, nivel: 8, idade: 38, origem: 'Oficina Central' });
     await query(`INSERT INTO attributes (character_id, forca, agilidade, intelecto, vigor, presenca) VALUES (?, ?, ?, ?, ?, ?)`, [c6, 2, 2, 4, 2, 1]);
     await addFeature(c6, conhecimento, { value: 3, training_level: 'trained' });
+
+    // create tabs for additional characters
+    await createTabs(c5);
+    await createTabs(c6);
+
+    // criar alguns itens de preset no catálogo (se ainda não existirem)
+    const createCatalogItem = async (name, description, space, category) => {
+      const exists = await query(`SELECT id FROM items_catalog WHERE name = ?`, [name]);
+      if (exists && exists.length > 0) return;
+      await query(`INSERT INTO items_catalog (name, description, space, category) VALUES (?, ?, ?, ?)`, [name, description, space, category]);
+      console.log('✔ Item de catálogo criado:', name);
+    };
+
+    await createCatalogItem('Mochila tática', 'Mochila resistente com vários compartimentos.', 5, 'II');
+    await createCatalogItem('Kit de primeiros socorros', 'Materiais básicos para curar ferimentos leves.', 2, 'I');
+    await createCatalogItem('Lanterna LED', 'Lanterna de mão com baterias recarregáveis.', 1, 'I');
+    await createCatalogItem('Rádio portátil', 'Rádio para comunicação em curtas distâncias.', 1, 'I');
+    await createCatalogItem('Pistola curta', 'Arma pequena de fogo, geralmente 9mm.', 4, 'III');
+    await createCatalogItem('Colete balístico leve', 'Proteção corporal contra impacto reduzido.', 6, 'III');
+
 
     console.log('✅ Seed de teste expandida finalizada');
     process.exit();

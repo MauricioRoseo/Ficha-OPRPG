@@ -9,6 +9,10 @@ import CharacterStates from "../../../components/CharacterStates";
 import CharacterAttributes from "../../../components/CharacterAttributes";
 import ProtectionsPanel from "../../../components/ProtectionsPanel";
 import PericiasPanel from "../../../components/PericiasPanel";
+import AttacksPanel from "../../../components/AttacksPanel";
+import ProficienciesPanel from "../../../components/ProficienciesPanel";
+import InventoryPanel from "../../../components/InventoryPanel";
+import SkillsPanel from "../../../components/SkillsPanel";
 
 export default function CharacterPage() {
   const params = useParams();
@@ -19,6 +23,8 @@ export default function CharacterPage() {
   const [attributes, setAttributes] = useState({});
   const [protections, setProtections] = useState([]);
   const [resistances, setResistances] = useState({});
+  const [tabs, setTabs] = useState([]);
+  const [activeTab, setActiveTab] = useState('ficha');
   const [status, setStatus] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
 
@@ -58,6 +64,17 @@ export default function CharacterPage() {
         setAttributes(data.attributes || {});
         setProtections(data.protections || []);
         setResistances(data.resistances || {});
+        // fetch tabs for this character
+        try {
+          const t = await fetch(`http://localhost:3001/characters/${id}/tabs`, { headers: { Authorization: `Bearer ${token}` } });
+          if (t.ok) {
+            const tabsJson = await t.json();
+            setTabs(tabsJson || []);
+            if (tabsJson && tabsJson.length > 0) setActiveTab(tabsJson[0].tab_key || 'ficha');
+          }
+        } catch (e) {
+          // ignore
+        }
         setStatus("");
       } catch (err) {
         setStatus("> erro de conexão");
@@ -169,7 +186,7 @@ export default function CharacterPage() {
 
                   <div>
                     <p className="text-gray-400 text-xs">Patente</p>
-                    <p>{getPatente(character.prestigio)}</p>
+                    <p>{character.patente || getPatente(character.prestigio)}</p>
                   </div>
 
                   <div className="col-span-2">
@@ -199,35 +216,83 @@ export default function CharacterPage() {
         </div>
       </main>
 
-      {/* Segunda parte da ficha: papel com três colunas (Status | Dados | Extras) */}
-      <FichaPaper>
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
-          <div className="md:col-span-2 pr-4 md:pr-8 md:border-r md:border-white/6">
-            <StatusSection character={character} />
-          </div>
-
-          <div className="md:col-span-2">
-            <CharacterStates character={character} />
-          </div>
-
-            <div className="md:col-span-2">
-            <CharacterAttributes character={character} attributes={attributes} />
-          </div>
+      {/* Tabs */}
+      <div className="mt-6">
+        <div className="flex gap-2">
+          {(tabs && tabs.length > 0 ? tabs : [
+            { tab_key: 'ficha', title: 'Ficha' },
+            { tab_key: 'antecedente', title: 'Antecedente' },
+            { tab_key: 'notas', title: 'Notas' }
+          ]).map(t => (
+            <button key={t.tab_key} onClick={() => setActiveTab(t.tab_key)} className={`px-3 py-1 rounded ${activeTab===t.tab_key ? 'bg-white/8' : 'bg-transparent'} border border-white/10`}>{t.title}</button>
+          ))}
         </div>
-      </FichaPaper>
+      </div>
 
-      {/* Terceira parte da ficha: Proteções/Resistências (3/6) + Perícias (3/6) */}
-      <FichaPaper>
-        <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
-            <div className="md:col-span-3">
-              <ProtectionsPanel character={character} attributes={attributes} protections={protections} resistances={resistances} onCharacterUpdate={setCharacter} onResistancesUpdate={setResistances} />
-          </div>
+      {/* Tab content */}
+      {activeTab === 'ficha' ? (
+        <>
+          <FichaPaper>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
+              <div className="md:col-span-2 pr-4 md:pr-8 md:border-r md:border-white/6">
+                <StatusSection character={character} />
+              </div>
 
-          <div className="md:col-span-3">
-            <PericiasPanel character={character} attributes={attributes} />
+              <div className="md:col-span-2">
+                <CharacterStates character={character} />
+              </div>
+
+                <div className="md:col-span-2">
+                <CharacterAttributes character={character} attributes={attributes} />
+              </div>
+            </div>
+          </FichaPaper>
+
+          <FichaPaper>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
+              <div className="md:col-span-3">
+                <ProtectionsPanel character={character} attributes={attributes} protections={protections} resistances={resistances} onCharacterUpdate={setCharacter} onResistancesUpdate={setResistances} />
+              </div>
+
+              <div className="md:col-span-3">
+                <PericiasPanel character={character} attributes={attributes} />
+              </div>
+            </div>
+          </FichaPaper>
+
+          <FichaPaper>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
+              <div className="md:col-span-3">
+                <AttacksPanel character={character} attributes={attributes} />
+              </div>
+              <div className="md:col-span-3">
+                <ProficienciesPanel character={character} onCharacterUpdate={setCharacter} />
+              </div>
+            </div>
+          </FichaPaper>
+
+          <FichaPaper>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
+              <div className="md:col-span-3">
+                <InventoryPanel character={character} onCharacterUpdate={setCharacter} />
+              </div>
+
+              <div className="md:col-span-3">
+                <SkillsPanel character={character} />
+              </div>
+            </div>
+          </FichaPaper>
+        </>
+      ) : (
+        <FichaPaper>
+          <div className="p-6">
+            <h3 className="text-lg font-bold">{(tabs.find(t=>t.tab_key===activeTab)?.title) || (activeTab==='antecedente'?'Antecedente':'Notas')}</h3>
+            <div className="text-sm text-gray-400 mt-2">Sem conteúdo por enquanto.</div>
           </div>
-        </div>
-      </FichaPaper>
+        </FichaPaper>
+      )}
+
+      {/* As sections da ficha agora são renderizadas dentro da aba ativa (veja abaixo). */}
     </div>
   );
 }

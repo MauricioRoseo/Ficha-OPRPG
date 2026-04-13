@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 function getPatente(prestigio = 0) {
@@ -14,22 +14,40 @@ function getPatente(prestigio = 0) {
 export default function CharacterCard({ character, onClick, compact = false, currentUserName = '' }) {
   const router = useRouter();
   const click = onClick || (() => router.push(`/character/${character.id}`));
+  const [local, setLocal] = useState(character || {});
+
+  useEffect(() => setLocal(character || {}), [character]);
+
+  useEffect(() => {
+    const handler = (e) => {
+      try {
+        const updated = e.detail;
+        if (updated && updated.id === (character && character.id)) setLocal(updated);
+      } catch (err) {
+        // ignore
+      }
+    };
+    window.addEventListener('character:updated', handler);
+    return () => window.removeEventListener('character:updated', handler);
+  }, [character]);
+
+  const c = local;
 
   return (
     <div onClick={click} className={`card cursor-pointer border border-white/8 rounded-lg overflow-hidden bg-white/3 transition duration-150 ${compact ? 'p-2' : ''}`}>
 
       <div className="flex items-center">
         <div className="w-36 h-36 flex-shrink-0 border-r border-white/10 bg-[#021018] flex items-center justify-center">
-          {character.imagem_perfil ? (
-            <img src={character.imagem_perfil} alt={character.name} className="w-full h-full object-cover" />
+          {c.imagem_perfil ? (
+            <img src={c.imagem_perfil} alt={c.name} className="w-full h-full object-cover" />
           ) : (
             <div className="text-xs text-gray-500">SEM IMAGEM</div>
           )}
         </div>
 
         <div className="flex-1 p-4">
-          <h3 className="text-lg font-bold">{character.name}</h3>
-          <p className="text-xs text-gray-400">Origem: {character.origem || '-'}</p>
+          <h3 className="text-lg font-bold">{c.name}</h3>
+          <p className="text-xs text-gray-400">Origem: {c.origem || '-'}</p>
 
           <div className="mt-3 grid grid-cols-2 gap-2 text-sm">
             <div>
@@ -42,11 +60,11 @@ export default function CharacterCard({ character, onClick, compact = false, cur
             </div>
             <div>
               <p className="text-gray-400 text-xs">Prestígio</p>
-              <p>{character.prestigio || 0}</p>
+              <p>{c.prestigio || 0}</p>
             </div>
             <div>
               <p className="text-gray-400 text-xs">Patente</p>
-              <p>{getPatente(character.prestigio)}</p>
+              <p>{c.patente || getPatente(c.prestigio)}</p>
             </div>
           </div>
 
@@ -65,7 +83,7 @@ export default function CharacterCard({ character, onClick, compact = false, cur
             </div>
             <div>
               <p className="text-gray-400 text-xs">Jogador</p>
-              <p>{currentUserName || character.user_name || '-'}</p>
+              <p>{currentUserName || c.user_name || '-'}</p>
             </div>
             <div className="col-span-2">
               <p className="text-gray-400 text-xs">Afinidade</p>

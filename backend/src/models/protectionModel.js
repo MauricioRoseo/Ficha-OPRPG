@@ -76,3 +76,9 @@ ProtectionModel.createFromTemplate = (templateRow, characterId, overrides, callb
 
   db.query(sql, values, callback);
 };
+
+// delete a protection by id
+ProtectionModel.deleteById = (id, callback) => {
+  const sql = `DELETE FROM protections WHERE id = ?`;
+  db.query(sql, [id], callback);
+};

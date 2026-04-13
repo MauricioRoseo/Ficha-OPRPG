@@ -21,6 +21,21 @@ const FeatureController = {
     });
   },
 
+  search: (req, res) => {
+    const q = req.query.q || '';
+    const type = req.query.type || null;
+
+    FeatureService.getAllFeatures((err, results) => {
+      if (err) return res.status(500).json(err);
+
+      let filtered = results || [];
+      if (type) filtered = filtered.filter(f => f.type === type);
+      if (q) filtered = filtered.filter(f => (f.name || '').toLowerCase().includes(q.toLowerCase()));
+
+      res.json(filtered);
+    });
+  },
+
   addToCharacter: (req, res) => {
     const { characterId, featureId } = req.params;
 
@@ -43,6 +58,21 @@ const FeatureController = {
       if (err) return res.status(500).json(err);
 
       res.json(results);
+    });
+  }
+
+  ,
+
+  removeFromCharacter: (req, res) => {
+    const { characterId, id } = req.params;
+    const userId = req.user && req.user.id;
+
+    FeatureService.removeFeatureFromCharacter(characterId, id, userId, (err, result) => {
+      if (err) {
+        if (err.message === 'Acesso negado') return res.status(403).json({ message: err.message });
+        return res.status(500).json({ message: err.message || 'Erro' });
+      }
+      res.json({ message: 'Perícia removida' });
     });
   }
 

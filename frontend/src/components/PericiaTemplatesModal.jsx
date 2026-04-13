@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 export default function PericiaTemplatesModal({ isOpen, onClose, onUse, onCreateNew }) {
   const [templates, setTemplates] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
-  const [form, setForm] = useState({ name: '', atributo: '', description: '', penalidade_carga: 0, extra_bonus: 0 });
+  const [form, setForm] = useState({ name: '', atributo: 'agilidade', description: '', penalidade_carga: 0, extra_bonus: 0 });
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   useEffect(() => {
@@ -71,7 +71,13 @@ export default function PericiaTemplatesModal({ isOpen, onClose, onUse, onCreate
             </div>
             <div>
               <label className="text-sm text-gray-400">Atributo base</label>
-              <input className="w-full mt-1 p-2 bg-transparent border border-white/6 rounded" value={form.atributo} onChange={(e)=>setForm(f=>({...f, atributo: e.target.value}))} />
+              <select className="w-full mt-1 p-2 bg-[#021018] text-white border border-white/6 rounded focus:outline-none focus:ring-2 focus:ring-white/10" value={form.atributo} onChange={(e)=>setForm(f=>({...f, atributo: e.target.value}))}>
+                <option value="agilidade">Agilidade</option>
+                <option value="forca">Força</option>
+                <option value="intelecto">Intelecto</option>
+                <option value="presenca">Presença</option>
+                <option value="vigor">Vigor</option>
+              </select>
             </div>
             <div>
               <label className="text-sm text-gray-400">Descrição</label>

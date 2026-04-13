@@ -229,6 +229,85 @@ const ProtectionController = {
       });
     });
   }
+
+              ,
+
+              remove: (req, res) => {
+                const { id } = req.params;
+                const tokenUserId = req.user && req.user.id;
+
+                ProtectionModel.findById(id, (err, protection) => {
+                  if (err) return res.status(500).json(err);
+                  if (!protection) return res.status(404).json({ message: 'Proteção não encontrada' });
+
+                  const CharacterModel = require('../models/characterModel');
+                  CharacterModel.findById(protection.character_id, (err2, character) => {
+                    if (err2) return res.status(500).json(err2);
+                    if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
+                    if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+
+                    // proceed to delete
+                    ProtectionModel.deleteById(id, (err3, result) => {
+                      if (err3) return res.status(500).json(err3);
+
+                      // recompute passive defense and adjust resistances/encumbrance if needed
+                      ProtectionModel.findByCharacterId(protection.character_id, (err4, protections) => {
+                        if (err4) return res.status(500).json(err4);
+                        const sum = (protections || []).filter(p=>p.equipped==1).reduce((acc, p) => acc + (p.passive_defense||0), 0);
+                        CharacterModel.setPassiveDefense(protection.character_id, sum, (err5) => {
+                          if (err5) return res.status(500).json(err5);
+
+                          // if deleted protection was equipped, remove its resistance/encumbrance
+                          try {
+                            if (protection.equipped) {
+                              const dr = Number(protection.damage_resistance || 0);
+                              const enc = Number(protection.encumbrance_penalty || 0);
+                              const ResistanceModel = require('../models/resistanceModel');
+                              const FeatureModel = require('../models/featureModel');
+                              if (enc !== 0) {
+                                FeatureModel.incrementEncumbranceForCharacter(protection.character_id, -enc, (err6) => {
+                                  if (err6) return res.status(500).json(err6);
+                                  if (dr !== 0) {
+                                    ResistanceModel.incrementPhysical(protection.character_id, -dr, (err7) => {
+                                      if (err7) return res.status(500).json(err7);
+                                      ResistanceModel.findByCharacterId(protection.character_id, (err8, resistances) => {
+                                        if (err8) return res.status(500).json(err8);
+                                        res.json({ message: 'Proteção removida', defesa_passiva: sum, resistances });
+                                      });
+                                    });
+                                    return;
+                                  }
+
+                                  ResistanceModel.findByCharacterId(protection.character_id, (err7, resistances) => {
+                                    if (err7) return res.status(500).json(err7);
+                                    res.json({ message: 'Proteção removida', defesa_passiva: sum, resistances });
+                                  });
+                                });
+                                return;
+                              }
+
+                              if (dr !== 0) {
+                                ResistanceModel.incrementPhysical(protection.character_id, -dr, (err6) => {
+                                  if (err6) return res.status(500).json(err6);
+                                  ResistanceModel.findByCharacterId(protection.character_id, (err7, resistances) => {
+                                    if (err7) return res.status(500).json(err7);
+                                    res.json({ message: 'Proteção removida', defesa_passiva: sum, resistances });
+                                  });
+                                });
+                                return;
+                              }
+                            }
+                          } catch(e) {
+                            console.error('Erro ao ajustar resistencias após remover proteção', e);
+                          }
+
+                          res.json({ message: 'Proteção removida', defesa_passiva: sum });
+                        });
+                      });
+                    });
+                  });
+                });
+              }
 };
 
 module.exports = ProtectionController;

@@ -6,6 +6,7 @@ import PericiaTemplatesModal from "./PericiaTemplatesModal";
 export default function PericiasPanel({ character, attributes }) {
   const data = attributes || character || {};
   const [pericias, setPericias] = useState([]);
+  const [showDescFor, setShowDescFor] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
@@ -59,29 +60,62 @@ export default function PericiasPanel({ character, attributes }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-400">
-                  <th>Nome</th>
-                  <th>Atributo</th>
-                  <th className="w-28">Nível Trein.</th>
-                  <th className="w-20">Bônus Extra</th>
-                  <th className="w-24">Penal. Carga</th>
-                  <th className="w-20">Total</th>
-                </tr>
+                    <th>Nome</th>
+                    <th>Atributo</th>
+                    <th className="w-28">Nível Trein.</th>
+                    <th className="w-20">Bônus Extra</th>
+                    <th className="w-24">Penal. Carga</th>
+                    <th className="w-20">Total</th>
+                    <th className="w-12" />
+                  </tr>
               </thead>
               <tbody>
                 {pericias.map(p => (
                   <tr key={p.id} className="border-t border-white/6">
-                    <td className="py-2">{p.name}</td>
-                    <td className="py-2">{p.metadata?.atributo || '-'}</td>
+                      <td className="py-2">
+                        <div className="flex items-center gap-2">
+                          <span>{p.name}</span>
+                        </div>
+                      </td>
+                    <td className="py-2">{p.atributo || p.metadata?.atributo || '-'}</td>
                     <td className="py-2">{p.training_level}</td>
                     <td className="py-2">{p.extra ?? 0}</td>
                     <td className="py-2">{p.penalidade_carga ? (p.encumbrance_penalty ?? 0) : '-'}</td>
                     <td className="py-2">{p.total ?? ( (p.value||0) + (p.extra||0) )}</td>
-                  </tr>
+                      <td className="py-2 text-right">
+                        {p.description ? (
+                          <button onClick={() => setShowDescFor(p.id)} title="Descrição" className="text-gray-400 hover:text-white mr-3">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
+                          </button>
+                        ) : null}
+                        <button onClick={async ()=>{
+                          if (!confirm('Remover perícia do personagem?')) return;
+                          try {
+                            const res = await fetch(`http://localhost:3001/features/character/${character.id}/${p.id}`, { method: 'DELETE', headers: { Authorization: token ? `Bearer ${token}` : '' } });
+                            if (!res.ok) throw new Error('Erro ao remover');
+                            await fetchCharacterPericias();
+                          } catch (e) { console.error(e); alert('Erro ao remover perícia'); }
+                        }} className="text-red-400 hover:text-red-500" title="Remover perícia">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
+                        </button>
+                      </td>
+                    </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+        {showDescFor ? (
+          <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center">
+            <div className="modal-card bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-lg">
+              <h3 className="text-lg font-bold mb-2">Descrição</h3>
+              <div className="text-sm mb-4">{(pericias.find(x=>x.id===showDescFor)?.description) || 'Sem descrição.'}</div>
+              <div className="flex justify-end">
+                <button onClick={()=>setShowDescFor(null)} className="px-3 py-1 border border-white/10 rounded">Fechar</button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <PericiaTemplatesModal isOpen={showTemplates} onClose={() => setShowTemplates(false)} onUse={handleUseTemplate} onCreateNew={() => { setShowTemplates(false); setShowAdd(true); }} />
@@ -103,7 +137,8 @@ export default function PericiasPanel({ character, attributes }) {
                 // legacy metadata kept for attribute mapping, but encumbrance handled via top-level fields
                 metadata: { atributo: f.get('atributo') },
                 has_encumbrance_penalty: penalidadeFlag ? 1 : 0,
-                encumbrance_penalty: penalidadeFlag ? Number(penalidadeFlag) : null
+                encumbrance_penalty: penalidadeFlag ? Number(penalidadeFlag) : null,
+                extra: f.get('extra_bonus') ? Number(f.get('extra_bonus')) : 0
               };
               try {
                 const r = await fetch('http://localhost:3001/features', { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
@@ -126,7 +161,13 @@ export default function PericiasPanel({ character, attributes }) {
               </div>
               <div>
                 <label className="text-sm text-gray-400">Atributo base</label>
-                <input name="atributo" className="w-full mt-1 p-2 bg-transparent border border-white/6 rounded" />
+                <select name="atributo" className="w-full mt-1 p-2 bg-[#021018] text-white border border-white/6 rounded focus:outline-none focus:ring-2 focus:ring-white/10">
+                  <option value="agilidade">Agilidade</option>
+                  <option value="forca">Força</option>
+                  <option value="intelecto">Intelecto</option>
+                  <option value="presenca">Presença</option>
+                  <option value="vigor">Vigor</option>
+                </select>
               </div>
               <div>
                 <label className="text-sm text-gray-400">Descrição</label>

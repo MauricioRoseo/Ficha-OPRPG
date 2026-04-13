@@ -34,6 +34,40 @@ CREATE TABLE characters (
     esforco INT DEFAULT 0,
     defesa INT DEFAULT 0,
 
+    -- Snapshot and runtime status fields
+    vida_atual INT DEFAULT 0,
+    vida_max INT DEFAULT 0,
+    vida_temp INT DEFAULT 0,
+
+    sanidade_atual INT DEFAULT 0,
+    sanidade_max INT DEFAULT 0,
+
+    esforco_atual INT DEFAULT 0,
+    esforco_max INT DEFAULT 0,
+    esforco_temp INT DEFAULT 0,
+
+    prestigio INT DEFAULT 0,
+
+    patente VARCHAR(100) DEFAULT NULL,
+
+    morrendo TINYINT DEFAULT 0,
+    enlouquecendo TINYINT DEFAULT 0,
+
+    deslocamento_atual INT DEFAULT 0,
+    deslocamento_max INT DEFAULT 0,
+
+    imagem_perfil TEXT,
+    imagem_token TEXT,
+
+    defesa_passiva INT DEFAULT 0,
+    esquiva INT DEFAULT 0,
+    bloqueio INT DEFAULT 0,
+    proficiencias TEXT,
+    -- carga atual e máxima e patrimônio (inventário)
+    carga_atual INT DEFAULT 0,
+    carga_maxima INT DEFAULT 0,
+    patrimonio TEXT,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -67,9 +101,11 @@ CREATE TABLE features (
         'regra_casa'
     ) NOT NULL,
     description TEXT,
+    origin VARCHAR(150) DEFAULT NULL,
     -- whether this feature (pericia) supports encumbrance penalty
     has_encumbrance_penalty TINYINT(1) DEFAULT 0,
     encumbrance_penalty INT DEFAULT NULL,
+    metadata JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -80,12 +116,24 @@ CREATE TABLE character_features (
     feature_id INT NOT NULL,
 
     value INT DEFAULT 0,
-    trained BOOLEAN DEFAULT FALSE,
     extra INT DEFAULT 0,
     notes TEXT,
 
+    -- training level replaces the old boolean 'trained'
+    training_level ENUM('none', 'trained', 'veteran', 'expert') DEFAULT 'none',
+
+    -- snapshot of an optional template for this feature
+    template_id INT DEFAULT NULL,
+    template_name VARCHAR(150) DEFAULT NULL,
+    template_description TEXT DEFAULT NULL,
+    template_metadata JSON DEFAULT NULL,
+    encumbrance_penalty INT DEFAULT NULL,
+
+    KEY `template_id` (`template_id`),
+
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
-    FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE
+    FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE,
+    CONSTRAINT `character_features_ibfk_template` FOREIGN KEY (`template_id`) REFERENCES features(`id`) ON DELETE SET NULL
 );
 
 -- Inventory
@@ -101,17 +149,32 @@ CREATE TABLE inventory (
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
 
--- Attacks
+-- Catalog of system items for searching presets
+CREATE TABLE items_catalog (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    description TEXT,
+    space INT DEFAULT 0,
+    category ENUM('0','I','II','III','IV') DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Attacks (weapons/attacks per character)
 CREATE TABLE attacks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     character_id INT NOT NULL,
 
-    name VARCHAR(100) NOT NULL,
-    attack_bonus VARCHAR(20),
-    damage VARCHAR(50),
-    crit VARCHAR(20),
-    range_type VARCHAR(50),
-    ammo VARCHAR(20),
+    weapon VARCHAR(150) NOT NULL,
+    damage_type VARCHAR(50) DEFAULT NULL,
+    range_type ENUM('Adjacente','Curto','Médio','Longo','Extremo','Ilimitado') DEFAULT 'Adjacente',
+    base_pericia VARCHAR(80) DEFAULT NULL, -- stored as 'xd20+y' string
+    damage VARCHAR(80) DEFAULT NULL,
+    crit_margin INT DEFAULT NULL,
+    crit_multiplier INT DEFAULT NULL,
+    ammo VARCHAR(80) DEFAULT NULL,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
 
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
@@ -142,23 +205,6 @@ CREATE TABLE resistances (
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
 
-CREATE TABLE protections (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    character_id INT NOT NULL,
-
-    equipped TINYINT(1) DEFAULT 0,
-    name VARCHAR(150) NOT NULL,
-    passive_defense INT DEFAULT 0,
-    damage_resistance INT DEFAULT 0,
-    encumbrance_penalty INT DEFAULT 0,
-    notes TEXT,
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-
-    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
-);
-
 -- New table for protection templates (catalog of protections available system-wide)
 CREATE TABLE `protection_templates` (
     `id` int NOT NULL AUTO_INCREMENT,
@@ -177,9 +223,27 @@ CREATE TABLE `protection_templates` (
     CONSTRAINT `protection_templates_ibfk_1` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
--- Per-character protections remain in `protections` table. Add a reference to the template (nullable)
-ALTER TABLE `protections` ADD COLUMN `template_id` int DEFAULT NULL, ADD KEY `template_id` (`template_id`);
-ALTER TABLE `protections` ADD CONSTRAINT `protections_ibfk_2` FOREIGN KEY (`template_id`) REFERENCES `protection_templates` (`id`) ON DELETE SET NULL;
+CREATE TABLE protections (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    character_id INT NOT NULL,
+
+    equipped TINYINT(1) DEFAULT 0,
+    name VARCHAR(150) NOT NULL,
+    passive_defense INT DEFAULT 0,
+    damage_resistance INT DEFAULT 0,
+    encumbrance_penalty INT DEFAULT 0,
+    template_id INT DEFAULT NULL,
+    notes TEXT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+
+    KEY `template_id` (`template_id`),
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    CONSTRAINT `protections_ibfk_2` FOREIGN KEY (`template_id`) REFERENCES `protection_templates` (`id`) ON DELETE SET NULL
+);
+
+-- Per-character protections remain in `protections` table and already include `template_id` referencing templates
 
 -- Convenience: copy of template into protections will duplicate relevant fields so users may edit without affecting the template.
 
@@ -222,62 +286,7 @@ CREATE TABLE system_features (
     FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE
 );
 
-ALTER TABLE character_features
-DROP COLUMN trained;
-
-ALTER TABLE character_features
-ADD training_level ENUM('none', 'trained', 'veteran', 'expert') DEFAULT 'none';
-
--- Snapshot fields so a character can have an editable copy of a feature/template
-ALTER TABLE character_features
-ADD COLUMN template_id INT DEFAULT NULL,
-ADD COLUMN template_name VARCHAR(150) DEFAULT NULL,
-ADD COLUMN template_description TEXT DEFAULT NULL,
-ADD COLUMN template_metadata JSON DEFAULT NULL,
-ADD COLUMN encumbrance_penalty INT DEFAULT NULL,
-ADD KEY `template_id` (`template_id`);
-ALTER TABLE character_features
-ADD CONSTRAINT `character_features_ibfk_template` FOREIGN KEY (`template_id`) REFERENCES features(`id`) ON DELETE SET NULL;
-
-ALTER TABLE features
-ADD COLUMN metadata JSON;
-
-ALTER TABLE characters
-
--- VIDA
-ADD vida_atual INT DEFAULT 0,
-ADD vida_max INT DEFAULT 0,
-ADD vida_temp INT DEFAULT 0,
-
--- SANIDADE
-ADD sanidade_atual INT DEFAULT 0,
-ADD sanidade_max INT DEFAULT 0,
-
--- ESFORÇO
-ADD esforco_atual INT DEFAULT 0,
-ADD esforco_max INT DEFAULT 0,
-ADD esforco_temp INT DEFAULT 0,
-
--- PRESTÍGIO
-ADD prestigio INT DEFAULT 0,
-
--- ESTADOS
-ADD morrendo TINYINT DEFAULT 0,
-ADD enlouquecendo TINYINT DEFAULT 0,
-
--- DESLOCAMENTO
-ADD deslocamento_atual INT DEFAULT 0,
-ADD deslocamento_max INT DEFAULT 0,
-
--- IMAGENS
-ADD imagem_perfil TEXT,
-ADD imagem_token TEXT;
-
--- Adiciona campos de defesa passiva, esquiva e bloqueio à tabela characters
-ALTER TABLE characters
-    ADD COLUMN defesa_passiva INT DEFAULT 0,
-    ADD COLUMN esquiva INT DEFAULT 0,
-    ADD COLUMN bloqueio INT DEFAULT 0;
+-- Previously applied ALTER TABLE migrations have been integrated into the CREATE statements above.
 
 -- Trigger: whenever a character is created, insert a default resistances row (all zeros)
 DELIMITER //
@@ -288,3 +297,15 @@ BEGIN
     INSERT INTO resistances (character_id) VALUES (NEW.id);
 END;//
 DELIMITER ;
+
+-- Character tabs: per-character configuration of visible tabs in the character UI
+CREATE TABLE character_tabs (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    character_id INT NOT NULL,
+    tab_key VARCHAR(50) NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    position INT DEFAULT 0,
+    visible TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
