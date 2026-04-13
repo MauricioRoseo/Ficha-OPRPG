@@ -2,12 +2,14 @@
 
 import React, { useState } from "react";
 import ProtectionFormModal from "./ProtectionFormModal";
+import ProtectionTemplatesModal from "./ProtectionTemplatesModal";
 
-export default function ProtectionsPanel({ character, attributes, protections: initialProtections, onCharacterUpdate }) {
+export default function ProtectionsPanel({ character, attributes, protections: initialProtections, resistances = {}, onCharacterUpdate, onResistancesUpdate }) {
   const data = attributes || character || {};
   const [protections, setProtections] = useState(initialProtections || []);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const [showAddModal, setShowAddModal] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
 
   const toggleEquipped = async (protId, currentlyEquipped) => {
     // optimistic update
@@ -28,6 +30,9 @@ export default function ProtectionsPanel({ character, attributes, protections: i
         if (data.defesa_passiva !== undefined && onCharacterUpdate) {
           onCharacterUpdate(prev => ({ ...prev, defesa_passiva: data.defesa_passiva }));
         }
+          if (data.resistances && onResistancesUpdate) {
+            onResistancesUpdate(data.resistances);
+          }
       } else {
         // revert on error status
         setProtections((prev) => prev.map(p => p.id === protId ? { ...p, equipped: currentlyEquipped } : p));
@@ -54,7 +59,10 @@ export default function ProtectionsPanel({ character, attributes, protections: i
       <div className="panel panel-protections p-4 rounded">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm text-gray-400">Lista de proteções vinculadas ao personagem</div>
-          <button onClick={() => setShowAddModal(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Adicionar proteção</button>
+          <div className="flex gap-2">
+            <button onClick={() => setShowTemplates(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Adicionar proteção</button>
+            <button onClick={() => setShowAddModal(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Criar manual</button>
+          </div>
         </div>
 
         {(!protections || protections.length === 0) ? (
@@ -87,8 +95,66 @@ export default function ProtectionsPanel({ character, attributes, protections: i
             </table>
           </div>
         )}
+        {/* Resistances display: normal damages and paranormal damages stacked */}
+        <div className="mt-4">
+          <div className="text-sm text-gray-400 mb-2">Resistência a danos</div>
+          <div className="grid grid-cols-5 gap-2 mb-4">
+            {[
+              ['acid', 'Ácido'],
+              ['balistico', 'Balístico'],
+              ['corte', 'Corte'],
+              ['eletricidade', 'Eletricidade'],
+              ['fogo', 'Fogo'],
+              ['frio', 'Frio'],
+              ['impacto', 'Impacto'],
+              ['mental', 'Mental'],
+              ['perfuracao', 'Perfuração'],
+              ['veneno', 'Veneno']
+            ].map(([key, label]) => (
+              <div key={key} className="bg-white/3 rounded p-2 text-center">
+                <div className="text-lg font-bold">{resistances[key] ?? 0}</div>
+                <div className="text-xs text-gray-300">{label}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="text-sm text-gray-400 mb-2">Resistência a danos paranormais</div>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              ['morte', 'Morte'],
+              ['sangue', 'Sangue'],
+              ['energia', 'Energia'],
+              ['conhecimento', 'Conhecimento']
+            ].map(([key, label]) => (
+              <div key={key} className="bg-white/3 rounded p-2 text-center">
+                <div className="text-lg font-bold">{resistances[key] ?? 0}</div>
+                <div className="text-xs text-gray-300">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
       <ProtectionFormModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onCreated={handleCreated} characterId={character?.id} />
+      <ProtectionTemplatesModal isOpen={showTemplates} onClose={() => setShowTemplates(false)} onCreateNew={() => { setShowTemplates(false); setShowAddModal(true); }} onUse={async (template) => {
+        // call backend to copy template into protections
+        try {
+          const res = await fetch('http://localhost:3001/protections/from-template', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
+            body: JSON.stringify({ template_id: template.id, character_id: character?.id })
+          });
+          if (!res.ok) throw new Error('Erro ao adicionar proteção do template');
+          const data = await res.json();
+          if (data.protection) {
+            handleCreated({ ...data.protection, defesa_passiva: data.defesa_passiva });
+            if (data.resistances && onResistancesUpdate) onResistancesUpdate(data.resistances);
+          }
+          setShowTemplates(false);
+        } catch (e) {
+          alert('Erro ao usar template');
+          console.error(e);
+        }
+      }} />
     </div>
   );
 }

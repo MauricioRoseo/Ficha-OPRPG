@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import overlayImg from "../assets/images/attributes/overlay.png";
 
 export default function CharacterAttributes({ character, attributes }) {
   const attrs = attributes || character || {};
@@ -9,9 +10,14 @@ export default function CharacterAttributes({ character, attributes }) {
     <div>
       <div className="mb-3 stat-label">Atributos</div>
 
-      <div className="atributos-card relative rounded p-4">
-        {/* Background image placed via CSS; user can drop image into src/assets/images/attributes */}
-        <div className="atributos-overlay p-4 relative">
+      <div className="atributos-card rounded">
+        {/* Render the overlay image directly so it loads consistently across machines */}
+        <div className="atributos-inner" style={{ position: 'relative' }}>
+          <img src={overlayImg?.src || overlayImg} alt="atributos" className="atributos-bg w-full h-auto block rounded" />
+
+          {/* semi-transparent overlay to improve contrast for numbers */}
+          <div className="atributos-overlay" aria-hidden="true"></div>
+
           {/* Absolute positioned small boxes placed to align with the overlay image.
               Tweak positions in globals.css (.atributo-pos-*) if needed. */}
           <div className="atributo-pos atributo-pos-agi">

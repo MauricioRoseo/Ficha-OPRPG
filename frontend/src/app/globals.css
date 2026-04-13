@@ -192,19 +192,26 @@ body {
 .stat-label { font-size:0.85rem; color:rgba(255,255,255,0.75); }
 
 /* Atributos card with background image */
+
 .atributos-card {
-  background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  /* Keep card surface and border but remove the built-in translucent gradient
+     so we don't double-overlay the image. The component renders the
+     visual overlay (.atributos-overlay) for consistent cross-machine results. */
+  background: transparent;
   border: 1px solid rgba(255,255,255,0.06);
-  min-height: 360px;
   background-repeat: no-repeat;
   background-position: center center;
-  background-size: 85%;
+  background-size: contain;
 }
 
-/* User should place an image at src/assets/images/attributes/overlay.png */
-.atributos-card { background-image: url('../assets/images/attributes/overlay.png'); }
+/* The overlay image is now rendered by the React component for reliability across environments.
+   Keep a sensible min-height to avoid layout collapse on very small screens. */
+.atributos-card { min-height: 240px; }
 
-.atributos-overlay { background: rgba(0,0,0,0.28); border-radius:6px; min-height:360px; }
+/* overlay that sits above the image to improve contrast */
+.atributos-inner { width: 100%; }
+.atributos-bg { display:block; width:100%; height:auto; border-radius:6px; }
+.atributos-overlay { position: absolute; inset: 0; border-radius:6px; background: rgba(0,0,0,0.28); pointer-events: none; }
 
 .atributo-box { background: rgba(255,255,255,0.02); padding:6px; border-radius:8px; text-align:center; display:flex; align-items:center; justify-content:center; }
 .atributo-value { font-size:1.35rem; font-weight:900; margin-top:0; line-height:1; }
@@ -212,9 +219,9 @@ body {
 
 /* Absolute positions for attribute values over the overlay image.
    Adjust top/left percentages to align with your overlay image. */
-.atributos-overlay { position: relative; }
 
-.atributo-pos { position: absolute; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.5); border-radius:10px; border:1px solid rgba(255,255,255,0.06); box-shadow: 0 4px 10px rgba(0,0,0,0.35); }
+
+.atributo-pos { position: absolute; width: clamp(36px, 6vw, 56px); height: clamp(36px, 6vw, 56px); display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.55); border-radius:10px; border:1px solid rgba(255,255,255,0.06); box-shadow: 0 6px 14px rgba(0,0,0,0.45); z-index: 10; box-sizing: border-box; padding:4px; }
 
 /* Positions tuned to the provided overlay image; adjust percentages if needed. */
 .atributo-pos-agi { top: 10%; left: 50%; transform: translate(-50%, -0%); }
@@ -224,13 +231,17 @@ body {
 .atributo-pos-vig { top: 74%; left: 70%; transform: translate(-50%, -50%); }
 
 @media (max-width: 640px) {
-  .atributo-pos { width:40px; height:40px; }
+  .atributo-pos { width:36px; height:36px; }
   .atributo-pos-agi { top: 11%; }
   .atributo-pos-for { top: 34%; left: 16%; }
   .atributo-pos-int { top: 34%; left: 84%; }
   .atributo-pos-pre { top: 74%; left: 34%; }
   .atributo-pos-vig { top: 74%; left: 66%; }
 }
+
+/* prevent numbers from overflowing their boxes */
+.atributo-value { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.atributo-value.small { font-size: clamp(1rem, 2.2vw, 1.15rem); }
 
 .bar-bg { width:100%; height:10px; border-radius:999px; overflow:hidden; }
 .bar-fill { height:100%; border-radius:999px; }

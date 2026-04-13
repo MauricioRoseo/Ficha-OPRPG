@@ -18,6 +18,7 @@ export default function CharacterPage() {
   const [character, setCharacter] = useState(null);
   const [attributes, setAttributes] = useState({});
   const [protections, setProtections] = useState([]);
+  const [resistances, setResistances] = useState({});
   const [status, setStatus] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
 
@@ -56,6 +57,7 @@ export default function CharacterPage() {
         setCharacter(data.character || data);
         setAttributes(data.attributes || {});
         setProtections(data.protections || []);
+        setResistances(data.resistances || {});
         setStatus("");
       } catch (err) {
         setStatus("> erro de conexão");
@@ -218,7 +220,7 @@ export default function CharacterPage() {
       <FichaPaper>
         <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
             <div className="md:col-span-3">
-            <ProtectionsPanel character={character} attributes={attributes} protections={protections} onCharacterUpdate={setCharacter} />
+              <ProtectionsPanel character={character} attributes={attributes} protections={protections} resistances={resistances} onCharacterUpdate={setCharacter} onResistancesUpdate={setResistances} />
           </div>
 
           <div className="md:col-span-3">

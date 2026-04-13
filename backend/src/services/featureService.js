@@ -19,7 +19,22 @@ const FeatureService = {
   },
 
   addFeatureToCharacter: (characterId, featureId, data, callback) => {
-    FeatureModel.addToCharacter(characterId, featureId, data, callback);
+    // First read the canonical feature to snapshot its metadata into the character row
+    FeatureModel.findById(featureId, (err, featureRow) => {
+      if (err) return callback(err);
+      if (!featureRow) return callback(new Error('Feature not found'));
+
+      const payload = Object.assign({}, data, {
+        template_id: featureRow.id,
+        template_name: featureRow.name,
+        template_description: featureRow.description,
+        template_metadata: featureRow.metadata,
+        has_encumbrance_penalty: featureRow.has_encumbrance_penalty ? 1 : 0,
+        encumbrance_penalty: featureRow.encumbrance_penalty !== undefined ? featureRow.encumbrance_penalty : null
+      });
+
+      FeatureModel.addToCharacter(characterId, featureId, payload, callback);
+    });
   },
 
   // 🔥 versão com metadata + cálculo
@@ -58,7 +73,10 @@ const FeatureService = {
             total,
             training_level: f.training_level,
             extra: f.extra,
-            penalidade_carga: f.metadata?.penalidade_carga || false
+            // penalidade_carga: whether this pericia supports encumbrance penalty
+            penalidade_carga: (f.encumbrance_penalty !== null),
+            // current encumbrance penalty value applied to this character (if supported)
+            encumbrance_penalty: f.encumbrance_penalty !== null ? Number(f.encumbrance_penalty) : null
           });
 
         } else {

@@ -60,12 +60,19 @@ const CharacterService = {
           ProtectionModel.findByCharacterId(characterId, (err4, protections) => {
             if (err4) return callback(err4);
 
-            callback(null, {
-              character,
-              attributes: attributes[0] || {},
-              features,
-              protections: protections || []
-            });
+                  // resistances
+                  const ResistanceModel = require('../models/resistanceModel');
+                  ResistanceModel.findByCharacterId(characterId, (err5, resistances) => {
+                    if (err5) return callback(err5);
+
+                    callback(null, {
+                      character,
+                      attributes: attributes[0] || {},
+                      features,
+                      protections: protections || [],
+                      resistances: resistances || {}
+                    });
+                  });
           });
         });
       });

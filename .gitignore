@@ -5,5 +5,4 @@ build/
 .vscode/
 .DS_Store
 src/database/seedFeatures.full.js
-src/database/seedTestData.js
 docs/chat-log.md

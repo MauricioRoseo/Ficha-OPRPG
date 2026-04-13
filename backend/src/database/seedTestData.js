@@ -140,9 +140,26 @@ const seed = async () => {
         return;
       }
 
-      const sql = `INSERT INTO character_features (character_id, feature_id, value, training_level, extra) VALUES (?, ?, ?, ?, ?)`;
-      // training_level must match enum: 'none', 'trained', 'veteran', 'expert'
-      const vals = [charId, feat.id, opts.value || 1, opts.training_level || 'none', opts.extra || null];
+      // fetch canonical feature to snapshot metadata
+      const featureRow = await query(`SELECT * FROM features WHERE id = ?`, [feat.id]);
+      const fr = featureRow && featureRow.length > 0 ? featureRow[0] : null;
+
+      const sql = `INSERT INTO character_features (character_id, feature_id, value, training_level, extra, notes, template_id, template_name, template_description, template_metadata, encumbrance_penalty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+      const vals = [
+        charId,
+        feat.id,
+        opts.value || 1,
+        opts.training_level || 'none',
+        opts.extra || null,
+        opts.notes || null,
+        fr ? fr.id : null,
+        fr ? fr.name : null,
+        fr ? fr.description : null,
+        fr ? JSON.stringify(fr.metadata || {}) : null,
+        // encumbrance_penalty: if feature supports penalty, default to its value or 0, otherwise null
+        fr && fr.has_encumbrance_penalty ? (fr.encumbrance_penalty !== null ? fr.encumbrance_penalty : 0) : null
+      ];
+
       await query(sql, vals);
       console.log(`✔ Feature ${feat.name} vinculada a char ${charId}`);
     };
