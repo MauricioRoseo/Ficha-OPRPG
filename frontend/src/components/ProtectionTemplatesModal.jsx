@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 
-export default function ProtectionTemplatesModal({ isOpen, onClose, onUse, onCreateNew }) {
+export default function ProtectionTemplatesModal({ isOpen, onClose, onUse }) {
   const [templates, setTemplates] = useState([]);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -31,7 +31,6 @@ export default function ProtectionTemplatesModal({ isOpen, onClose, onUse, onCre
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-bold">Selecionar Proteção (Templates)</h3>
           <div className="flex gap-2">
-            <button onClick={onCreateNew} className="px-2 py-1 border border-white/10 rounded text-sm">Cadastrar nova</button>
             <button onClick={onClose} className="px-2 py-1 border border-white/10 rounded text-sm">Fechar</button>
           </div>
         </div>

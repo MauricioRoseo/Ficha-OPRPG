@@ -24,10 +24,17 @@ export default function CharacterPage() {
   const [attributes, setAttributes] = useState({});
   const [protections, setProtections] = useState([]);
   const [resistances, setResistances] = useState({});
+  const [background, setBackground] = useState(null);
+  const [phobias, setPhobias] = useState([]);
+  const [paranormalEncounters, setParanormalEncounters] = useState([]);
   const [tabs, setTabs] = useState([]);
   const [activeTab, setActiveTab] = useState('ficha');
   const [status, setStatus] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
+  const [notes, setNotes] = useState([]);
+  const [editingNote, setEditingNote] = useState(null);
+  const [noteTitle, setNoteTitle] = useState("");
+  const [noteContent, setNoteContent] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -63,8 +70,11 @@ export default function CharacterPage() {
         // backend returns { character, attributes, features }
         setCharacter(data.character || data);
         setAttributes(data.attributes || {});
-        setProtections(data.protections || []);
-        setResistances(data.resistances || {});
+  setProtections(data.protections || []);
+  setResistances(data.resistances || {});
+  setBackground(data.background || null);
+  setPhobias(data.phobias || []);
+  setParanormalEncounters(data.paranormal_encounters || []);
         // fetch tabs for this character
         try {
           const t = await fetch(`http://localhost:3001/characters/${id}/tabs`, { headers: { Authorization: `Bearer ${token}` } });
@@ -84,6 +94,100 @@ export default function CharacterPage() {
 
     fetchCharacter();
   }, [id]);
+
+  // load notes when Notes tab is activated
+  useEffect(() => {
+    if (!id) return;
+    if (activeTab !== 'notas') return;
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const fetchNotes = async () => {
+      try {
+        const res = await fetch(`http://localhost:3001/characters/${id}/notes`, { headers: { Authorization: `Bearer ${token}` } });
+        if (!res.ok) return;
+        const data = await res.json();
+        setNotes(data || []);
+      } catch (e) {
+        // ignore quietly
+      }
+    };
+
+    fetchNotes();
+  }, [id, activeTab]);
+
+  // notes helpers
+  const fetchNotes = async () => {
+    if (!id) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`http://localhost:3001/characters/${id}/notes`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) return;
+      const data = await res.json();
+      setNotes(data || []);
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleEditNote = (note) => {
+    setEditingNote(note);
+    setNoteTitle(note.title || '');
+    setNoteContent(note.content || '');
+  };
+
+  const handleNewNote = () => {
+    setEditingNote(null);
+    setNoteTitle('');
+    setNoteContent('');
+  };
+
+  const handleSaveNote = async () => {
+    if (!id) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const payload = { title: noteTitle, content: noteContent };
+    try {
+      if (editingNote && editingNote.id) {
+        const res = await fetch(`http://localhost:3001/characters/${id}/notes/${editingNote.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) return;
+      } else {
+        const res = await fetch(`http://localhost:3001/characters/${id}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) return;
+      }
+      await fetchNotes();
+      handleNewNote();
+    } catch (e) {
+      // ignore
+    }
+  };
+
+  const handleDeleteNote = async (noteId) => {
+    if (!id) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+    try {
+      const res = await fetch(`http://localhost:3001/characters/${id}/notes/${noteId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (!res.ok) return;
+      await fetchNotes();
+    } catch (e) {
+      // ignore
+    }
+  };
 
   if (status) {
     return (
@@ -119,12 +223,20 @@ export default function CharacterPage() {
           </div>
 
           <div>
-            <button
-              onClick={() => router.push("/dashboard")}
-              className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
-            >
-              Voltar
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
+              >
+                Voltar
+              </button>
+              <button
+                onClick={() => router.push(`/character/${id}/edit`)}
+                className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
+              >
+                Editar
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -296,7 +408,160 @@ export default function CharacterPage() {
         <FichaPaper>
           <div className="p-6">
             <h3 className="text-lg font-bold">{(tabs.find(t=>t.tab_key===activeTab)?.title) || (activeTab==='antecedente'?'Antecedente':'Notas')}</h3>
-            <div className="text-sm text-gray-400 mt-2">Sem conteúdo por enquanto.</div>
+
+            {/* Antecedentes content */}
+            {activeTab === 'antecedente' ? (
+              <div className="mt-4 space-y-6 text-sm">
+                <div>
+                  <h4 className="font-semibold">Histórico</h4>
+                  {background && background.historico ? (
+                    <div className="prose max-w-none mt-2" dangerouslySetInnerHTML={{ __html: background.historico }} />
+                  ) : (
+                    <div className="text-gray-400 mt-2">Sem histórico.</div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold">Aparência</h4>
+                    <div className="mt-2">{background && background.aparencia ? background.aparencia : <span className="text-gray-400">—</span>}</div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold">Personalidade</h4>
+                    <div className="mt-2">{background && background.personalidade ? background.personalidade : <span className="text-gray-400">—</span>}</div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <h4 className="font-semibold">Prato favorito</h4>
+                    <div className="mt-2">{background && background.prato_favorito ? background.prato_favorito : <span className="text-gray-400">—</span>}</div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold">Pessoas importantes</h4>
+                    <div className="mt-2">{background && background.pessoas_importantes ? background.pessoas_importantes : <span className="text-gray-400">—</span>}</div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold">Pertences queridos</h4>
+                    <div className="mt-2">{background && background.pertences_queridos ? background.pertences_queridos : <span className="text-gray-400">—</span>}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold">Contatos</h4>
+                  <div className="mt-2">{background && background.contatos ? background.contatos : <span className="text-gray-400">—</span>}</div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div>
+                    <h4 className="font-semibold">Traumas</h4>
+                    <div className="mt-2">{background && background.traumas ? background.traumas : <span className="text-gray-400">—</span>}</div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold">Doenças</h4>
+                    <div className="mt-2">{background && background.doencas ? background.doencas : <span className="text-gray-400">—</span>}</div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold">Manias</h4>
+                    <div className="mt-2">{background && background.manias ? background.manias : <span className="text-gray-400">—</span>}</div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold">Objetivo</h4>
+                  <div className="mt-2">{background && background.objetivo ? background.objetivo : <span className="text-gray-400">—</span>}</div>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold">Fobias</h4>
+                  {phobias && phobias.length > 0 ? (
+                    <ul className="list-disc ml-6 mt-2">
+                      {phobias.map(p => (
+                        <li key={p.id}>
+                          <strong>{p.phobia_name || p.custom_name || '(sem nome)'}</strong>
+                          {p.phobia_short_description || p.custom_short_description ? (
+                            <div className="text-xs text-gray-400">{p.phobia_short_description || p.custom_short_description}</div>
+                          ) : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-gray-400 mt-2">Sem fobias registradas.</div>
+                  )}
+                </div>
+
+                <div>
+                  <h4 className="font-semibold">Encontros paranormais</h4>
+                  {paranormalEncounters && paranormalEncounters.length > 0 ? (
+                    <div className="mt-2 space-y-3">
+                      {paranormalEncounters.map(enc => (
+                        <div key={enc.id} className="p-3 border border-white/6 rounded">
+                          <div className="flex items-baseline justify-between">
+                            <strong>{enc.title || 'Sem título'}</strong>
+                            <span className="text-xs text-gray-400">Sanidade perdida: {enc.sanity_loss || 0}</span>
+                          </div>
+                          <div className="text-sm mt-1">{enc.description || ''}</div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-gray-400 mt-2">Nenhum encontro paranormal registrado.</div>
+                  )}
+                </div>
+                </div>
+              ) : activeTab === 'notas' ? (
+                <div className="mt-4 text-sm">
+                  <div className="mb-4 flex items-center justify-between">
+                    <h4 className="font-semibold">Notas</h4>
+                    <div>
+                      <button onClick={handleNewNote} className="px-3 py-1 rounded border border-white/10 bg-transparent text-sm">Nova nota</button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="md:col-span-1">
+                      {notes && notes.length > 0 ? (
+                        <ul className="space-y-2">
+                          {notes.map(n => (
+                            <li key={n.id} className="p-2 border border-white/6 rounded cursor-pointer hover:bg-white/2">
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm font-medium" onClick={() => handleEditNote(n)}>{n.title || '(sem título)'}</div>
+                                <div className="text-xs text-gray-400">
+                                  <button onClick={() => handleDeleteNote(n.id)} className="px-2 py-1 rounded bg-red-600/30">Apagar</button>
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-400 mt-1">{(n.created_at || '').slice(0, 10)}</div>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <div className="text-gray-400">Nenhuma nota.</div>
+                      )}
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <div className="mb-2">
+                        <input value={noteTitle} onChange={(e) => setNoteTitle(e.target.value)} placeholder="Título" className="w-full px-3 py-2 bg-transparent border border-white/6 rounded" />
+                      </div>
+                      <div>
+                        <textarea value={noteContent} onChange={(e) => setNoteContent(e.target.value)} rows={12} className="w-full p-3 bg-transparent border border-white/6 rounded" placeholder="Conteúdo" />
+                      </div>
+
+                      <div className="mt-3 flex gap-2">
+                        <button onClick={handleSaveNote} className="px-3 py-1 rounded bg-green-600/80">Salvar</button>
+                        <button onClick={handleNewNote} className="px-3 py-1 rounded border border-white/10">Cancelar</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-gray-400 mt-2">Sem conteúdo por enquanto.</div>
+              )}
           </div>
         </FichaPaper>
       )}

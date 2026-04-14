@@ -5,9 +5,9 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "nodemon --watch src --ext js,json src/server.js",
-    "seed": "node src/database/seedFeatures.js",
-    "seed:test": "node src/database/seedTestData.js"
+  "dev": "nodemon --watch src --ext js,json src/server.js",
+  "seed": "node src/database/seedFeatures.js && node src/database/seedTestData.js",
+  "seed:test": "node src/database/seedTestData.js"
   },
   "keywords": [],
   "author": "",

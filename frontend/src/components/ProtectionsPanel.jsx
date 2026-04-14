@@ -152,7 +152,7 @@ export default function ProtectionsPanel({ character, attributes, protections: i
         </div>
       </div>
       <ProtectionFormModal isOpen={showAddModal} onClose={() => setShowAddModal(false)} onCreated={handleCreated} characterId={character?.id} />
-      <ProtectionTemplatesModal isOpen={showTemplates} onClose={() => setShowTemplates(false)} onCreateNew={() => { setShowTemplates(false); setShowAddModal(true); }} onUse={async (template) => {
+  <ProtectionTemplatesModal isOpen={showTemplates} onClose={() => setShowTemplates(false)} onUse={async (template) => {
         // call backend to copy template into protections
         try {
           const res = await fetch('http://localhost:3001/protections/from-template', {

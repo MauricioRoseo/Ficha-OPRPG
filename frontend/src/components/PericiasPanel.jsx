@@ -118,7 +118,7 @@ export default function PericiasPanel({ character, attributes }) {
         ) : null}
       </div>
 
-      <PericiaTemplatesModal isOpen={showTemplates} onClose={() => setShowTemplates(false)} onUse={handleUseTemplate} onCreateNew={() => { setShowTemplates(false); setShowAdd(true); }} />
+  <PericiaTemplatesModal isOpen={showTemplates} onClose={() => setShowTemplates(false)} onUse={handleUseTemplate} />
 
       {/* simple manual create: reuse existing feature creation endpoint for type 'pericia' */}
       {showAdd ? (

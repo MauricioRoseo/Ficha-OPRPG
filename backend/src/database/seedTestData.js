@@ -12,6 +12,15 @@ const query = (sql, values = []) => {
   });
 };
 
+// ensure a column exists on a table; adds it if missing
+const ensureColumnExists = async (table, column, definition) => {
+  const exists = await query(`SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`, [table, column]);
+  if (exists && exists[0] && exists[0].c === 0) {
+    await query(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+    console.log(`✔ Coluna ${column} adicionada em ${table}`);
+  }
+};
+
 const seed = async () => {
   try {
     console.log('🌱 Iniciando seed de teste expandida...');
@@ -74,6 +83,42 @@ const seed = async () => {
     const u2 = await createUser('Alice Silva', 'alice@example.com');
     const u3 = await createUser('Carlos Ramos', 'carlos@example.com');
     const u4 = await createUser('Mariana Costa', 'mariana@example.com');
+
+    // ensure characters table has the newer columns expected by seed scripts
+    try {
+      await ensureColumnExists('characters', 'vida_atual', 'vida_atual INT DEFAULT 0');
+      await ensureColumnExists('characters', 'vida_max', 'vida_max INT DEFAULT 0');
+      await ensureColumnExists('characters', 'vida_temp', 'vida_temp INT DEFAULT 0');
+
+      await ensureColumnExists('characters', 'sanidade_atual', 'sanidade_atual INT DEFAULT 0');
+      await ensureColumnExists('characters', 'sanidade_max', 'sanidade_max INT DEFAULT 0');
+
+      await ensureColumnExists('characters', 'esforco_atual', 'esforco_atual INT DEFAULT 0');
+      await ensureColumnExists('characters', 'esforco_max', 'esforco_max INT DEFAULT 0');
+      await ensureColumnExists('characters', 'esforco_temp', 'esforco_temp INT DEFAULT 0');
+
+      await ensureColumnExists('characters', 'prestigio', 'prestigio INT DEFAULT 0');
+      await ensureColumnExists('characters', 'morrendo', 'morrendo TINYINT DEFAULT 0');
+      await ensureColumnExists('characters', 'enlouquecendo', 'enlouquecendo TINYINT DEFAULT 0');
+
+      await ensureColumnExists('characters', 'deslocamento_atual', 'deslocamento_atual INT DEFAULT 0');
+      await ensureColumnExists('characters', 'deslocamento_max', 'deslocamento_max INT DEFAULT 0');
+
+      await ensureColumnExists('characters', 'imagem_perfil', 'imagem_perfil TEXT');
+      await ensureColumnExists('characters', 'imagem_token', 'imagem_token TEXT');
+
+      await ensureColumnExists('characters', 'idade', 'idade INT');
+
+      await ensureColumnExists('characters', 'defesa_passiva', 'defesa_passiva INT DEFAULT 0');
+      await ensureColumnExists('characters', 'esquiva', 'esquiva INT DEFAULT 0');
+      await ensureColumnExists('characters', 'bloqueio', 'bloqueio INT DEFAULT 0');
+
+      await ensureColumnExists('characters', 'proficiencias', 'proficiencias TEXT');
+      await ensureColumnExists('characters', 'patrimonio', 'patrimonio INT DEFAULT NULL');
+      await ensureColumnExists('characters', 'patente', "patente VARCHAR(150) DEFAULT NULL");
+      await ensureColumnExists('characters', 'carga_atual', 'carga_atual INT DEFAULT 0');
+      await ensureColumnExists('characters', 'carga_maxima', 'carga_maxima INT DEFAULT 0');
+    } catch (e) { console.warn('Erro garantindo colunas de characters:', e.message || e); }
 
     // criar personagens para cada usuário
     const c1 = await createCharacter(u1, {
@@ -291,6 +336,44 @@ const seed = async () => {
     await addCharacterRitualFromCatalog(c3, r4, 10 + 2, 3, 5);
     await addCharacterRitualFromCatalog(c4, r3, 10 + 4, 1, 3);
 
+
+    // --- Create some example template classes/trails/origins for dev convenience ---
+    const ensureTemplate = async () => {
+      // classes
+      const classesToCreate = ['Combatente','Infiltrador','Especialista','Healer'];
+      for (const cname of classesToCreate) {
+        const ex = await query(`SELECT id FROM classes WHERE name = ?`, [cname]);
+        if (!ex || ex.length === 0) {
+          await query(`INSERT INTO classes (name) VALUES (?)`, [cname]);
+          console.log('✔ Classe template criada:', cname);
+        }
+      }
+
+      // trails for Combatente
+      const cls = await query(`SELECT id FROM classes WHERE name = 'Combatente' LIMIT 1`);
+      if (cls && cls.length > 0) {
+        const classId = cls[0].id;
+        const existsT = await query(`SELECT id FROM trails WHERE class_id = ? AND name = ?`, [classId, 'Soldado']);
+        if (!existsT || existsT.length === 0) {
+          await query(`INSERT INTO trails (class_id, name, description) VALUES (?, ?, ?)`, [classId, 'Soldado', 'Trilha básica de combate.']);
+          await query(`INSERT INTO trails (class_id, name, description) VALUES (?, ?, ?)`, [classId, 'Mercenário', 'Trilha focada em operações táticas.']);
+          console.log('✔ Trilha(s) de exemplo criadas para Combatente');
+        }
+      }
+
+      // origins (link to two pericias and one habilidade when available)
+      const findFeat = (n) => features.find(f => f.name === n);
+      const p1 = findFeat('Furtividade');
+      const p2 = findFeat('Percepção');
+      const hab = findFeat('Cura Rápida') || findFeat('Cicatrização');
+      const existOrigin = await query(`SELECT id FROM origins WHERE name = ?`, ['Distrito 7']);
+      if (!existOrigin || existOrigin.length === 0) {
+        await query(`INSERT INTO origins (name, description, pericia_1_id, pericia_2_id, habilidade_id) VALUES (?, ?, ?, ?, ?)`, ['Distrito 7', 'Origem urbana, bairro operário do distrito 7.', p1 ? p1.id : null, p2 ? p2.id : null, hab ? hab.id : null]);
+        console.log('✔ Origem de exemplo criada: Distrito 7');
+      }
+    };
+
+    try { await ensureTemplate(); } catch(e) { console.warn('Erro criando templates de exemplo:', e.message || e); }
 
     console.log('✅ Seed de teste expandida finalizada');
     process.exit();

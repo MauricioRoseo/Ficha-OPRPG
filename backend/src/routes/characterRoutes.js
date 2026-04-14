@@ -11,5 +11,14 @@ router.get('/', authMiddleware, CharacterController.findAll);
 router.get('/:id/full', authMiddleware, CharacterController.getFull);
 // atualizar campos do personagem (stats)
 router.put('/:id', authMiddleware, CharacterController.update);
+// atualizar campos básicos/descrição/imagens do personagem
+router.put('/:id/details', authMiddleware, CharacterController.updateDetails);
+// atualizar/crear antecedentes (background)
+router.put('/:id/background', authMiddleware, CharacterController.updateBackground);
+// notas (character notes)
+router.get('/:id/notes', authMiddleware, CharacterController.getNotes);
+router.post('/:id/notes', authMiddleware, CharacterController.createNote);
+router.put('/:id/notes/:noteId', authMiddleware, CharacterController.updateNote);
+router.delete('/:id/notes/:noteId', authMiddleware, CharacterController.deleteNote);
 
 module.exports = router;

@@ -83,9 +83,24 @@ export default function InventoryPanel({ character, onCharacterUpdate }) {
   useEffect(() => {
     const handle = setTimeout(async () => {
       try {
-        const res = await fetch(`http://localhost:3001/characters/${character.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify({ patrimonio }) });
-        if (!res.ok) throw new Error('Erro ao salvar patrimônio');
-        if (onCharacterUpdate) onCharacterUpdate(prev => ({ ...prev, patrimonio }));
+        const raw = patrimonio;
+        const trimmed = raw === undefined || raw === null ? '' : String(raw);
+
+        // if empty, send null; otherwise send the raw string (allow free text)
+        const payloadPatrimonio = trimmed === '' ? null : trimmed;
+
+        const res = await fetch(`http://localhost:3001/characters/${character.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+          body: JSON.stringify({ patrimonio: payloadPatrimonio })
+        });
+        if (!res.ok) {
+          let msg = 'Erro ao salvar patrimônio';
+          try { const j = await res.json(); if (j && j.message) msg = j.message; } catch (e) {}
+          throw new Error(msg);
+        }
+
+        if (onCharacterUpdate) onCharacterUpdate(prev => ({ ...prev, patrimonio: payloadPatrimonio }));
       } catch (e) {
         console.error('Erro ao autosalvar patrimônio', e);
       }
@@ -201,7 +216,7 @@ export default function InventoryPanel({ character, onCharacterUpdate }) {
 
         <div className="mt-3">
           <label className="text-xs text-gray-400">Patrimônio</label>
-          <textarea value={patrimonio} onChange={e=>setPatrimonio(e.target.value)} className="w-full p-2 bg-[#021018] text-white border border-white/6 rounded" />
+          <textarea value={patrimonio} onChange={e=>{ setPatrimonio(e.target.value); }} className="w-full p-2 bg-[#021018] text-white border border-white/6 rounded" />
           <div className="flex justify-end mt-2">
             <div className="text-xs text-gray-400">(Salvamento automático ativado)</div>
           </div>

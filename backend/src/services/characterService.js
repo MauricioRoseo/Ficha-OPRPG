@@ -78,13 +78,33 @@ const CharacterService = {
                       character.carga_atual = cargaAtual;
                       character.carga_maxima = cargaMaxima;
 
-                      callback(null, {
-                        character,
-                        attributes: attributes[0] || {},
-                        features,
-                        protections: protections || [],
-                        resistances: resistances || {},
-                        inventory: inventory
+                      // fetch background, phobias and paranormal encounters
+                      const BackgroundModel = require('../models/backgroundModel');
+                      const CharacterPhobiaModel = require('../models/characterPhobiaModel');
+                      const ParanormalModel = require('../models/paranormalModel');
+
+                      BackgroundModel.findByCharacterId(characterId, (err7, background) => {
+                        if (err7) return callback(err7);
+
+                        CharacterPhobiaModel.findByCharacterId(characterId, (err8, phobias) => {
+                          if (err8) return callback(err8);
+
+                          ParanormalModel.findByCharacterId(characterId, (err9, encounters) => {
+                            if (err9) return callback(err9);
+
+                            callback(null, {
+                              character,
+                              attributes: attributes[0] || {},
+                              features,
+                              protections: protections || [],
+                              resistances: resistances || {},
+                              inventory: inventory,
+                              background: background || null,
+                              phobias: phobias || [],
+                              paranormal_encounters: encounters || []
+                            });
+                          });
+                        });
                       });
                     });
                   });

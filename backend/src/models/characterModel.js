@@ -137,3 +137,47 @@ CharacterModel.setCarga = (id, cargaAtual, cargaMaxima, callback) => {
   const sql = `UPDATE characters SET carga_atual = ?, carga_maxima = ? WHERE id = ?`;
   db.query(sql, [cargaAtual || 0, cargaMaxima || 0, id], callback);
 };
+
+// update basic character details (profile/configuration fields)
+CharacterModel.updateDetails = (id, data, callback) => {
+  // Note: patente should not be directly editable here (computed from prestigio).
+  // We update both the human-readable text fields and the *_id foreign keys (if provided)
+  const sql = `
+    UPDATE characters SET
+      name = ?,
+      idade = ?,
+      origem = ?,
+      origem_id = ?,
+      classe = ?,
+      classe_id = ?,
+      trilha = ?,
+      trilha_id = ?,
+      nivel = ?,
+      nex = ?,
+      prestigio = ?,
+      afinidade = ?,
+      imagem_perfil = ?,
+      imagem_token = ?
+    WHERE id = ?
+  `;
+
+  const values = [
+    data.name || null,
+    (data.idade !== undefined && data.idade !== null) ? data.idade : null,
+    data.origem || null,
+    (data.origem_id !== undefined ? data.origem_id : null),
+    data.classe || null,
+    (data.classe_id !== undefined ? data.classe_id : null),
+    data.trilha || null,
+    (data.trilha_id !== undefined ? data.trilha_id : null),
+    (data.nivel !== undefined && data.nivel !== null) ? data.nivel : null,
+    (data.nex !== undefined && data.nex !== null) ? data.nex : null,
+    (data.prestigio !== undefined && data.prestigio !== null) ? data.prestigio : null,
+    data.afinidade || null,
+    data.imagem_perfil || null,
+    data.imagem_token || null,
+    id
+  ];
+
+  db.query(sql, values, callback);
+};
