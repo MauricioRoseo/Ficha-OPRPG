@@ -13,6 +13,7 @@ import AttacksPanel from "../../../components/AttacksPanel";
 import ProficienciesPanel from "../../../components/ProficienciesPanel";
 import InventoryPanel from "../../../components/InventoryPanel";
 import SkillsPanel from "../../../components/SkillsPanel";
+import RituaisPanel from "../../../components/RituaisPanel";
 
 export default function CharacterPage() {
   const params = useParams();
@@ -279,6 +280,14 @@ export default function CharacterPage() {
 
               <div className="md:col-span-3">
                 <SkillsPanel character={character} />
+              </div>
+            </div>
+          </FichaPaper>
+
+          <FichaPaper>
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
+              <div className="md:col-span-6">
+                <RituaisPanel character={character} attributes={attributes} />
               </div>
             </div>
           </FichaPaper>

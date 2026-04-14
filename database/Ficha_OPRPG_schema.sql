@@ -260,14 +260,74 @@ CREATE TABLE rituals (
     range_type VARCHAR(80),
     alcance VARCHAR(100),
     duration VARCHAR(100),
-    possivel_resistencia TINYINT DEFAULT 0,
+    resistencia_pericia_id INT DEFAULT NULL,
     aprimoramento_discente TINYINT DEFAULT 0,
     custo_aprimoramento_discente INT DEFAULT NULL,
     aprimoramento_verdadeiro TINYINT DEFAULT 0,
     custo_aprimoramento_verdadeiro INT DEFAULT NULL,
+    descricao_aprimoramento_discente TEXT DEFAULT NULL,
+    descricao_aprimoramento_verdadeiro TEXT DEFAULT NULL,
     description TEXT,
 
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+);
+
+-- Catalog of rituals available system-wide
+CREATE TABLE rituals_catalog (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(150) NOT NULL,
+    circle TINYINT,
+    element VARCHAR(80),
+    description TEXT,
+    effect TEXT,
+    execution VARCHAR(150),
+    alcance VARCHAR(150),
+    duration VARCHAR(150),
+    resistencia_pericia_id INT DEFAULT NULL,
+    aprimoramento_discente TINYINT DEFAULT 0,
+    custo_aprimoramento_discente INT DEFAULT NULL,
+    descricao_aprimoramento_discente TEXT DEFAULT NULL,
+    aprimoramento_verdadeiro TINYINT DEFAULT 0,
+    custo_aprimoramento_verdadeiro INT DEFAULT NULL,
+    descricao_aprimoramento_verdadeiro TEXT DEFAULT NULL,
+    symbol_image TEXT,
+    symbol_image_secondary TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Rituals owned by a character (links to catalog optionally)
+CREATE TABLE character_rituals (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    character_id INT NOT NULL,
+    ritual_catalog_id INT DEFAULT NULL,
+
+    -- stored/computed values per character
+    dt_resistencia INT DEFAULT NULL,
+    circulo TINYINT DEFAULT NULL,
+    limite_rituais INT DEFAULT NULL,
+
+    -- snapshot of ritual data (when added from catalog or created custom)
+    snapshot_name VARCHAR(150) DEFAULT NULL,
+    snapshot_element VARCHAR(80) DEFAULT NULL,
+    snapshot_description TEXT,
+    snapshot_execution VARCHAR(150) DEFAULT NULL,
+    snapshot_alcance VARCHAR(150) DEFAULT NULL,
+    snapshot_duration VARCHAR(150) DEFAULT NULL,
+    snapshot_resistencia_pericia_id INT DEFAULT NULL,
+    snapshot_resistencia_pericia_name VARCHAR(150) DEFAULT NULL,
+    snapshot_aprimoramento_discente TINYINT DEFAULT 0,
+    snapshot_custo_aprimoramento_discente INT DEFAULT NULL,
+    snapshot_descricao_aprimoramento_discente TEXT DEFAULT NULL,
+    snapshot_aprimoramento_verdadeiro TINYINT DEFAULT 0,
+    snapshot_custo_aprimoramento_verdadeiro INT DEFAULT NULL,
+    snapshot_descricao_aprimoramento_verdadeiro TEXT DEFAULT NULL,
+    snapshot_symbol TEXT,
+    snapshot_symbol_secondary TEXT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+
+    FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
+    FOREIGN KEY (ritual_catalog_id) REFERENCES rituals_catalog(id) ON DELETE SET NULL
 );
 
 -- Systems

@@ -226,6 +226,71 @@ const seed = async () => {
     await createCatalogItem('Pistola curta', 'Arma pequena de fogo, geralmente 9mm.', 4, 'III');
     await createCatalogItem('Colete balístico leve', 'Proteção corporal contra impacto reduzido.', 6, 'III');
 
+    // criar alguns rituais de preset no catálogo (se ainda não existirem)
+    // ensure rituals_catalog has new columns (if DB wasn't migrated)
+    const ensureColumn = async (table, column, definition) => {
+      const exists = await query(`SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?`, [table, column]);
+      if (exists && exists[0] && exists[0].c === 0) {
+        await query(`ALTER TABLE ${table} ADD COLUMN ${definition}`);
+        console.log(`✔ Coluna ${column} adicionada em ${table}`);
+      }
+    };
+
+    // ensure catalog columns
+    try {
+      await ensureColumn('rituals_catalog', 'execution', 'execution VARCHAR(150)');
+      await ensureColumn('rituals_catalog', 'alcance', "alcance VARCHAR(150)");
+      await ensureColumn('rituals_catalog', 'duration', "duration VARCHAR(150)");
+      await ensureColumn('rituals_catalog', 'resistencia_pericia_id', 'resistencia_pericia_id INT DEFAULT NULL');
+      await ensureColumn('rituals_catalog', 'aprimoramento_discente', 'aprimoramento_discente TINYINT DEFAULT 0');
+      await ensureColumn('rituals_catalog', 'custo_aprimoramento_discente', 'custo_aprimoramento_discente INT DEFAULT NULL');
+      await ensureColumn('rituals_catalog', 'descricao_aprimoramento_discente', 'descricao_aprimoramento_discente TEXT DEFAULT NULL');
+      await ensureColumn('rituals_catalog', 'aprimoramento_verdadeiro', 'aprimoramento_verdadeiro TINYINT DEFAULT 0');
+      await ensureColumn('rituals_catalog', 'custo_aprimoramento_verdadeiro', 'custo_aprimoramento_verdadeiro INT DEFAULT NULL');
+      await ensureColumn('rituals_catalog', 'descricao_aprimoramento_verdadeiro', 'descricao_aprimoramento_verdadeiro TEXT DEFAULT NULL');
+      await ensureColumn('rituals_catalog', 'symbol_image_secondary', 'symbol_image_secondary TEXT');
+    } catch (e) { console.warn('Erro garantindo colunas do catálogo:', e.message || e); }
+
+    const createCatalogRitual = async (name, circle, element, description, effect, execution, alcance, duration, resistencia_pericia_id, aprimoramento_discente, custo_discente, descricao_discente, aprimoramento_verdadeiro, custo_verdadeiro, descricao_verdadeiro, symbol, symbol2) => {
+      const exists = await query(`SELECT id FROM rituals_catalog WHERE name = ?`, [name]);
+      if (exists && exists.length > 0) return exists[0].id;
+      const res = await query(`INSERT INTO rituals_catalog (name, circle, element, description, effect, execution, alcance, duration, resistencia_pericia_id, aprimoramento_discente, custo_aprimoramento_discente, descricao_aprimoramento_discente, aprimoramento_verdadeiro, custo_aprimoramento_verdadeiro, descricao_aprimoramento_verdadeiro, symbol_image, symbol_image_secondary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [name, circle, element, description, effect, execution, alcance, duration, resistencia_pericia_id || null, aprimoramento_discente ? 1 : 0, custo_discente || null, descricao_discente || null, aprimoramento_verdadeiro ? 1 : 0, custo_verdadeiro || null, descricao_verdadeiro || null, symbol || null, symbol2 || null]);
+      console.log('✔ Ritual de catálogo criado:', name);
+      return res.insertId;
+    };
+
+    const addCharacterRitualFromCatalog = async (charId, ritualCatalogId, dt_resistencia, circulo, limite_rituais) => {
+      // ensure character_rituals has snapshot descricao columns
+      try {
+        const exists1 = await query(`SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'character_rituals' AND COLUMN_NAME = 'snapshot_descricao_aprimoramento_discente'`);
+        if (exists1 && exists1[0] && exists1[0].c === 0) await query(`ALTER TABLE character_rituals ADD COLUMN snapshot_descricao_aprimoramento_discente TEXT DEFAULT NULL`);
+        const exists2 = await query(`SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'character_rituals' AND COLUMN_NAME = 'snapshot_descricao_aprimoramento_verdadeiro'`);
+        if (exists2 && exists2[0] && exists2[0].c === 0) await query(`ALTER TABLE character_rituals ADD COLUMN snapshot_descricao_aprimoramento_verdadeiro TEXT DEFAULT NULL`);
+        const exists3 = await query(`SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'character_rituals' AND COLUMN_NAME = 'snapshot_resistencia_pericia_id'`);
+        if (exists3 && exists3[0] && exists3[0].c === 0) await query(`ALTER TABLE character_rituals ADD COLUMN snapshot_resistencia_pericia_id INT DEFAULT NULL`);
+        const exists4 = await query(`SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'character_rituals' AND COLUMN_NAME = 'snapshot_resistencia_pericia_name'`);
+        if (exists4 && exists4[0] && exists4[0].c === 0) await query(`ALTER TABLE character_rituals ADD COLUMN snapshot_resistencia_pericia_name VARCHAR(150) DEFAULT NULL`);
+      } catch (e) { /* ignore */ }
+
+      const catalog = await query(`SELECT * FROM rituals_catalog WHERE id = ?`, [ritualCatalogId]);
+      if (!catalog || catalog.length === 0) return;
+      const c = catalog[0];
+      await query(`INSERT INTO character_rituals (character_id, ritual_catalog_id, dt_resistencia, circulo, limite_rituais, snapshot_name, snapshot_element, snapshot_description, snapshot_execution, snapshot_alcance, snapshot_duration, snapshot_resistencia_pericia_id, snapshot_resistencia_pericia_name, snapshot_aprimoramento_discente, snapshot_custo_aprimoramento_discente, snapshot_descricao_aprimoramento_discente, snapshot_aprimoramento_verdadeiro, snapshot_custo_aprimoramento_verdadeiro, snapshot_descricao_aprimoramento_verdadeiro, snapshot_symbol, snapshot_symbol_secondary) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, [charId, ritualCatalogId, dt_resistencia, circulo, limite_rituais, c.name, c.element, c.description, c.execution, c.alcance, c.duration, c.resistencia_pericia_id || null, null, c.aprimoramento_discente, c.custo_aprimoramento_discente, c.descricao_aprimoramento_discente, c.aprimoramento_verdadeiro, c.custo_aprimoramento_verdadeiro, c.descricao_aprimoramento_verdadeiro, c.symbol_image, c.symbol_image_secondary]);
+      console.log(`✔ Ritual ${c.name} vinculado ao personagem ${charId}`);
+    };
+
+    // criar rituais de catálogo
+    const r1 = await createCatalogRitual('Chama Purificadora', 1, 'Fogo', 'Chama que remove corrupção e cura feridas superficiais.', 'Dano de fogo menor e purificação', 'Invocação breve', 'Alvo', 'Curto (1 rodada)', null, 0, null, null, 0, null, null, null, null);
+    const r2 = await createCatalogRitual('Escudo Etéreo', 2, 'Força', 'Cria um escudo protetor que reduz dano recebido.', 'Redução de dano temporária', 'Gestual', 'Área', '2 rodadas', null, 0, null, null, 0, null, null, null, null);
+    const r3 = await createCatalogRitual('Visão Além', 1, 'Ar', 'Permite ao conjurador ver através de ilusões e até pequenas distâncias astral.', 'Aumenta percepção por tempo curto', 'Concentração', 'Alvo', '3 rodadas', null, 0, null, null, 0, null, null, null, null);
+    const r4 = await createCatalogRitual('Corrente de Entendimento', 3, 'Conhecimento', 'Liga mentes para compartilhamento de conhecimento instantâneo.', 'Compartilha informações entre aliados', 'Cerimonial', 'Área', '1 rodada', null, 0, null, null, 0, null, null, null, null);
+
+    // vincular rituais a personagens de exemplo (usando presença e intelecto dos personagens criados earlier)
+    await addCharacterRitualFromCatalog(c1, r1, 10 + 1, 1, 1); // presenca 1, intelecto 1
+    await addCharacterRitualFromCatalog(c2, r2, 10 + 2, 2, 3);
+    await addCharacterRitualFromCatalog(c3, r4, 10 + 2, 3, 5);
+    await addCharacterRitualFromCatalog(c4, r3, 10 + 4, 1, 3);
+
 
     console.log('✅ Seed de teste expandida finalizada');
     process.exit();

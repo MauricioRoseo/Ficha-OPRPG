@@ -53,8 +53,8 @@ export default function PericiaTemplatesModal({ isOpen, onClose, onUse, onCreate
   if (!isOpen) return null;
 
   return (
-    <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center">
-      <div className="modal-card bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-2xl">
+    <div className="modal-overlay fixed inset-0 z-60 flex items-center justify-center">
+      <div className="modal-card relative z-60 bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-2xl">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-lg font-bold">Perícias cadastradas</h3>
           <div className="flex gap-2">
