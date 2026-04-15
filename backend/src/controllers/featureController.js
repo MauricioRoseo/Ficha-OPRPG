@@ -76,6 +76,22 @@ const FeatureController = {
     });
   }
 
+  ,
+
+  updateCharacterFeature: (req, res) => {
+    const { characterId, id } = req.params;
+    const userId = req.user && req.user.id;
+    const payload = req.body || {};
+
+    FeatureService.updateCharacterFeature(characterId, id, payload, userId, (err, result) => {
+      if (err) {
+        if (err.message === 'Acesso negado') return res.status(403).json({ message: err.message });
+        return res.status(500).json({ message: err.message || 'Erro' });
+      }
+      res.json({ message: 'Perícia atualizada' });
+    });
+  }
+
 };
 
 module.exports = FeatureController;

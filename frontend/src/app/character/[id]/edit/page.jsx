@@ -87,7 +87,8 @@ export default function CharacterEditPage() {
           imagem_perfil: (data.character && data.character.imagem_perfil) || '',
           imagem_token: (data.character && data.character.imagem_token) || ''
           ,
-          status_formula: (data.character && data.character.status_formula) ? (typeof data.character.status_formula === 'string' ? JSON.parse(data.character.status_formula) : data.character.status_formula) : null
+          status_formula: (data.character && data.character.status_formula) ? (typeof data.character.status_formula === 'string' ? JSON.parse(data.character.status_formula) : data.character.status_formula) : null,
+          defense_formula: (data.character && data.character.defense_formula) ? (typeof data.character.defense_formula === 'string' ? JSON.parse(data.character.defense_formula) : data.character.defense_formula) : null
         });
         setAttributes(data.attributes || {});
         setProtections(data.protections || []);
@@ -149,7 +150,8 @@ export default function CharacterEditPage() {
           afinidade: form.afinidade,
           imagem_perfil: form.imagem_perfil,
           imagem_token: form.imagem_token,
-          status_formula: form.status_formula || null
+          status_formula: form.status_formula || null,
+          defense_formula: form.defense_formula || null
         };
 
         const res = await fetch(`http://localhost:3001/characters/${id}/details`, {
@@ -158,8 +160,16 @@ export default function CharacterEditPage() {
           body: JSON.stringify(payload)
         });
         if (res.ok) {
-          // optimistic: update character state with form values
-          setCharacter(prev => ({ ...prev, ...payload }));
+          // parse returned json: controller may return computed max stats in `computed`
+          try {
+            const j = await res.json();
+            const computed = j && j.computed ? j.computed : {};
+            // apply payload and any computed fields returned by server
+            setCharacter(prev => ({ ...prev, ...payload, ...(computed || {}) }));
+          } catch (e) {
+            // fallback: at least apply payload
+            setCharacter(prev => ({ ...prev, ...payload }));
+          }
         } else {
           // you may want to handle server errors (for now just log)
           try { const j = await res.json(); console.error('Erro ao salvar detalhes:', j); } catch (e) { console.error('Erro ao salvar detalhes'); }
@@ -171,6 +181,39 @@ export default function CharacterEditPage() {
 
     return () => clearTimeout(handler);
   }, [form]);
+
+  // autosave attributes to backend (debounced)
+  useEffect(() => {
+    if (!attributes || !id) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const handler = setTimeout(async () => {
+      try {
+        const payload = {
+          forca: attributes.forca === '' ? null : (isNaN(Number(attributes.forca)) ? attributes.forca : Number(attributes.forca)),
+          agilidade: attributes.agilidade === '' ? null : (isNaN(Number(attributes.agilidade)) ? attributes.agilidade : Number(attributes.agilidade)),
+          intelecto: attributes.intelecto === '' ? null : (isNaN(Number(attributes.intelecto)) ? attributes.intelecto : Number(attributes.intelecto)),
+          vigor: attributes.vigor === '' ? null : (isNaN(Number(attributes.vigor)) ? attributes.vigor : Number(attributes.vigor)),
+          presenca: attributes.presenca === '' ? null : (isNaN(Number(attributes.presenca)) ? attributes.presenca : Number(attributes.presenca))
+        };
+
+        const res = await fetch(`http://localhost:3001/attributes/${id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          try { const j = await res.json(); console.error('Erro ao salvar atributos:', j); } catch(e) { console.error('Erro ao salvar atributos'); }
+        }
+      } catch (e) {
+        console.error('Erro no autosave de atributos', e);
+      }
+    }, 800);
+
+    return () => clearTimeout(handler);
+  }, [attributes]);
 
   if (status) {
     return (
@@ -212,13 +255,6 @@ export default function CharacterEditPage() {
                 className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
               >
                 Voltar à visualização
-              </button>
-              <button
-                onClick={() => setShowFormulaModal(true)}
-                title="Configurar cálculo automático de status"
-                className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
-              >
-                ⚙️
               </button>
             </div>
           </div>
@@ -368,10 +404,12 @@ export default function CharacterEditPage() {
               />
               <StatusFormulaModal
                 open={showFormulaModal}
-                initial={form ? (form.status_formula || null) : null}
+                initial={form ? ({ ...(form.status_formula || {}), defense: (form.defense_formula || null), nivel: form.nivel }) : null}
                 onClose={() => setShowFormulaModal(false)}
                 onSave={(obj) => {
-                  setForm(f => ({ ...(f || {}), status_formula: obj }));
+                  // obj contains status fields and nested obj.defense
+                  const statusOnly = { vida: obj.vida, esforco: obj.esforco, sanidade: obj.sanidade };
+                  setForm(f => ({ ...(f || {}), status_formula: statusOnly, defense_formula: obj.defense || (obj.defesa || null) }));
                   setShowFormulaModal(false);
                 }}
               />
@@ -397,6 +435,15 @@ export default function CharacterEditPage() {
       {activeTab === 'ficha' ? (
         <>
           <FichaPaper>
+            <div className="flex items-center justify-end px-4 -mt-2">
+              <button
+                onClick={() => setShowFormulaModal(true)}
+                title="Configurar cálculo automático de status"
+                className="border border-white/10 px-2 py-1 rounded text-sm hover:bg-white/5"
+              >
+                ⚙️ Fórmulas
+              </button>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
               <div className="md:col-span-2 pr-4 md:pr-8 md:border-r md:border-white/6">
                 <StatusSection character={character} />
@@ -407,7 +454,9 @@ export default function CharacterEditPage() {
               </div>
 
                 <div className="md:col-span-2">
-                <CharacterAttributes character={character} attributes={attributes} />
+                <CharacterAttributes character={character} attributes={attributes} editable={true} onChangeAttribute={(key, value) => {
+                  setAttributes(prev => ({ ...(prev || {}), [key]: value }));
+                }} />
               </div>
             </div>
           </FichaPaper>
@@ -415,7 +464,7 @@ export default function CharacterEditPage() {
           <FichaPaper>
             <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
               <div className="md:col-span-3">
-                <ProtectionsPanel character={character} attributes={attributes} protections={protections} resistances={resistances} onCharacterUpdate={setCharacter} onResistancesUpdate={setResistances} />
+                <ProtectionsPanel character={character} attributes={attributes} protections={protections} resistances={resistances} onCharacterUpdate={setCharacter} onResistancesUpdate={setResistances} editable={true} />
               </div>
 
               <div className="md:col-span-3">

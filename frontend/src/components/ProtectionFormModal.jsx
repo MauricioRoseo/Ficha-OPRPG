@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
-export default function ProtectionFormModal({ isOpen, onClose, onCreated, characterId }) {
+export default function ProtectionFormModal({ isOpen, onClose, onCreated, onSaved, characterId, initial }) {
   const [form, setForm] = useState({
     name: '',
     passive_defense: 0,
@@ -11,6 +11,22 @@ export default function ProtectionFormModal({ isOpen, onClose, onCreated, charac
     equipped: false,
     notes: ''
   });
+
+  useEffect(() => {
+    if (isOpen && initial) {
+      setForm({
+        name: initial.name || '',
+        passive_defense: initial.passive_defense ?? 0,
+        damage_resistance: initial.damage_resistance ?? 0,
+        encumbrance_penalty: initial.encumbrance_penalty ?? 0,
+        equipped: Boolean(initial.equipped),
+        notes: initial.notes || ''
+      });
+    }
+    if (isOpen && !initial) {
+      setForm({ name: '', passive_defense: 0, damage_resistance: 0, encumbrance_penalty: 0, equipped: false, notes: '' });
+    }
+  }, [isOpen, initial]);
 
   if (!isOpen) return null;
 
@@ -22,6 +38,27 @@ export default function ProtectionFormModal({ isOpen, onClose, onCreated, charac
     e.preventDefault();
     try {
       const body = { ...form, character_id: characterId };
+
+      if (initial && initial.id) {
+        // update
+        const res = await fetch(`http://localhost:3001/protections/${initial.id}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': token ? `Bearer ${token}` : ''
+          },
+          body: JSON.stringify(body)
+        });
+
+        if (!res.ok) throw new Error('Erro ao atualizar proteção');
+        const data = await res.json();
+        const updated = data.protection ? { ...data.protection, defesa_passiva: data.defesa_passiva } : data;
+        if (onSaved) onSaved(updated);
+        onClose();
+        return;
+      }
+
+      // create
       const res = await fetch('http://localhost:3001/protections', {
         method: 'POST',
         headers: {
@@ -35,21 +72,20 @@ export default function ProtectionFormModal({ isOpen, onClose, onCreated, charac
 
       const data = await res.json();
       if (onCreated) {
-        // attach returned defesa_passiva (if present) to the created object for parent to update
         const created = data.protection ? { ...data.protection, defesa_passiva: data.defesa_passiva } : data;
         onCreated(created);
       }
       onClose();
     } catch (err) {
       // simple alert for now
-      alert('Erro ao criar proteção');
+      alert(initial && initial.id ? 'Erro ao atualizar proteção' : 'Erro ao criar proteção');
     }
   };
 
   return (
     <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center">
       <div className="modal-card bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md">
-        <h3 className="text-lg font-bold mb-3">Adicionar Proteção</h3>
+        <h3 className="text-lg font-bold mb-3">{initial && initial.id ? 'Editar Proteção' : 'Adicionar Proteção'}</h3>
         <form onSubmit={handleSubmit} className="space-y-3">
           <div>
             <label className="text-sm text-gray-400">Nome</label>
@@ -85,7 +121,7 @@ export default function ProtectionFormModal({ isOpen, onClose, onCreated, charac
 
           <div className="flex gap-2 justify-end">
             <button type="button" onClick={onClose} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
-            <button type="submit" className="px-3 py-1 bg-white/6 rounded">Criar</button>
+            <button type="submit" className="px-3 py-1 bg-white/6 rounded">{initial && initial.id ? 'Salvar' : 'Criar'}</button>
           </div>
         </form>
       </div>

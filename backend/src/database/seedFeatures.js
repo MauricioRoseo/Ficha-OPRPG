@@ -49,6 +49,18 @@ const features = [
     metadata: { atributo: 'agilidade' }
   },
   {
+    name: 'Esquiva',
+    type: 'pericia',
+    description: 'Evitar ataques por esquiva e movimento.',
+    metadata: { atributo: 'agilidade' }
+  },
+  {
+    name: 'Fortitude',
+    type: 'pericia',
+    description: 'Resistência física e bloqueio.',
+    metadata: { atributo: 'forca' }
+  },
+  {
     name: 'Percepção',
     type: 'pericia',
     description: 'Detectar detalhes e perceber perigos.',

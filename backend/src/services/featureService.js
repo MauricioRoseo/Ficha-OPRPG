@@ -113,6 +113,31 @@ const FeatureService = {
     });
   }
 
+  ,
+
+  updateCharacterFeature: (characterId, charFeatureId, data, userId, callback) => {
+    const CharacterModel = require('../models/characterModel');
+    // verify ownership
+    CharacterModel.findById(characterId, (err, character) => {
+      if (err) return callback(err);
+      if (!character) return callback(new Error('Personagem não encontrado'));
+      if (character.user_id !== userId) return callback(new Error('Acesso negado'));
+
+      // ensure the character actually has this feature
+      FeatureModel.getByCharacter(characterId, (err2, features) => {
+        if (err2) return callback(err2);
+        const found = features.find(f => String(f.id) === String(charFeatureId));
+        if (!found) return callback(new Error('Perícia não encontrada neste personagem'));
+
+        // perform update
+        FeatureModel.updateCharacterFeature(charFeatureId, data, (err3, result) => {
+          if (err3) return callback(err3);
+          callback(null, result);
+        });
+      });
+    });
+  }
+
 };
 
 module.exports = FeatureService;

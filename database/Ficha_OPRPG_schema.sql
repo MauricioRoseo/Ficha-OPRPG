@@ -71,6 +71,8 @@ CREATE TABLE IF NOT EXISTS characters (
     carga_maxima INT DEFAULT 0,
 
     status_formula JSON DEFAULT NULL,
+    -- new: defense_formula allows configuring how passive/dodge/block are calculated
+    defense_formula JSON DEFAULT NULL,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 

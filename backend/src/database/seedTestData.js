@@ -118,6 +118,7 @@ const seed = async () => {
       await ensureColumnExists('characters', 'patente', "patente VARCHAR(150) DEFAULT NULL");
       await ensureColumnExists('characters', 'carga_atual', 'carga_atual INT DEFAULT 0');
       await ensureColumnExists('characters', 'carga_maxima', 'carga_maxima INT DEFAULT 0');
+      await ensureColumnExists('characters', 'defense_formula', 'defense_formula JSON DEFAULT NULL');
     } catch (e) { console.warn('Erro garantindo colunas de characters:', e.message || e); }
 
     // criar personagens para cada usuário
@@ -178,9 +179,16 @@ const seed = async () => {
       sanidade: { modifiers_per_level: [], modifiers_flat: [] }
     });
 
+    const defaultDefense = JSON.stringify({
+      passive: { attribute: 'agilidade', modifiers: [] },
+      dodge: { skill: 'Esquiva', modifiers: [] },
+      block: { skill: 'Fortitude', modifiers: [] }
+    });
+
     const setFormulaFor = async (charId) => {
       if (!charId) return;
       await query(`UPDATE characters SET status_formula = ? WHERE id = ?`, [defaultFormula, charId]);
+      await query(`UPDATE characters SET defense_formula = ? WHERE id = ?`, [defaultDefense, charId]);
     };
 
     await setFormulaFor(c1);

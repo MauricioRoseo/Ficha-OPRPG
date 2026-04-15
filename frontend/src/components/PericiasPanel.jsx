@@ -9,6 +9,8 @@ export default function PericiasPanel({ character, attributes }) {
   const [showDescFor, setShowDescFor] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [editingPericia, setEditingPericia] = useState(null);
+  const [showEdit, setShowEdit] = useState(false);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   const fetchCharacterPericias = async () => {
@@ -83,12 +85,12 @@ export default function PericiasPanel({ character, attributes }) {
                     <td className="py-2">{p.penalidade_carga ? (p.encumbrance_penalty ?? 0) : '-'}</td>
                     <td className="py-2">{p.total ?? ( (p.value||0) + (p.extra||0) )}</td>
                       <td className="py-2 text-right">
-                        {p.description ? (
+                          {p.description ? (
                           <button onClick={() => setShowDescFor(p.id)} title="Descrição" className="text-gray-400 hover:text-white mr-3">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
                           </button>
                         ) : null}
-                        <button onClick={async ()=>{
+                          <button onClick={async ()=>{
                           if (!confirm('Remover perícia do personagem?')) return;
                           try {
                             const res = await fetch(`http://localhost:3001/features/character/${character.id}/${p.id}`, { method: 'DELETE', headers: { Authorization: token ? `Bearer ${token}` : '' } });
@@ -98,6 +100,9 @@ export default function PericiasPanel({ character, attributes }) {
                         }} className="text-red-400 hover:text-red-500" title="Remover perícia">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
                         </button>
+                          <button onClick={() => { setEditingPericia(p); setShowEdit(true); }} title="Editar perícia" className="text-gray-300 hover:text-white ml-2 mr-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>
+                          </button>
                       </td>
                     </tr>
                 ))}
@@ -119,6 +124,53 @@ export default function PericiasPanel({ character, attributes }) {
       </div>
 
   <PericiaTemplatesModal isOpen={showTemplates} onClose={() => setShowTemplates(false)} onUse={handleUseTemplate} />
+
+        {showEdit ? (
+          <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center">
+            <div className="modal-card bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md">
+              <h3 className="text-lg font-bold mb-3">Editar Perícia</h3>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const f = new FormData(e.target);
+                const payload = {
+                  training_level: f.get('training_level'),
+                  extra: f.get('extra') ? Number(f.get('extra')) : 0,
+                  has_encumbrance_penalty: editingPericia.penalidade_carga ? 1 : 0,
+                  encumbrance_penalty: editingPericia.penalidade_carga ? (f.get('encumbrance_penalty') ? Number(f.get('encumbrance_penalty')) : 0) : null
+                };
+                try {
+                  const res = await fetch(`http://localhost:3001/features/character/${character.id}/${editingPericia.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+                  if (!res.ok) throw new Error('Erro ao atualizar perícia');
+                  await fetchCharacterPericias();
+                  setShowEdit(false);
+                  setEditingPericia(null);
+                } catch (err) {
+                  alert('Erro ao atualizar perícia'); console.error(err);
+                }
+              }} className="space-y-3">
+                <div>
+                  <label className="text-sm text-gray-400">Treinamento</label>
+                  <select name="training_level" defaultValue={editingPericia?.training_level || 'none'} className="w-full mt-1 p-2 bg-[#021018] text-white border border-white/6 rounded">
+                    <option value="none">Nenhum</option>
+                    <option value="trained">Treinado</option>
+                    <option value="veteran">Veterano</option>
+                    <option value="expert">Especialista</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input name="extra" type="number" defaultValue={editingPericia?.extra || 0} className="w-full mt-1 p-2 bg-transparent border border-white/6 rounded" />
+                  {editingPericia?.penalidade_carga ? (
+                    <input name="encumbrance_penalty" type="number" defaultValue={editingPericia?.encumbrance_penalty || 0} className="w-full mt-1 p-2 bg-transparent border border-white/6 rounded" />
+                  ) : <div />}
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={()=>{ setShowEdit(false); setEditingPericia(null); }} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
+                  <button className="px-3 py-1 bg-white/6 rounded">Salvar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
 
       {/* simple manual create: reuse existing feature creation endpoint for type 'pericia' */}
       {showAdd ? (

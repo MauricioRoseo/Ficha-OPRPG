@@ -83,7 +83,51 @@ const CharacterService = {
             const esforcoMax = Math.max(0, (effort_initial + presenca) + ((effort_per_level + presenca) * Math.max(0, (nivel - 1))) + (esforco_per_level_mod * nivel) + esforco_flat_mod);
             const sanidadeMax = Math.max(0, sanity_initial + (sanity_per_level * Math.max(0, (nivel - 1))) + (sanidade_per_level_mod * nivel) + sanidade_flat_mod);
 
-            return { vida_max: vidaMax, esforco_max: esforcoMax, sanidade_max: sanidadeMax };
+            // defense calculation: try to get defense_formula or fallback to formula.defesa
+            let defenseConfig = null;
+            try {
+              if (character.defense_formula) {
+                defenseConfig = typeof character.defense_formula === 'string' ? JSON.parse(character.defense_formula) : character.defense_formula;
+              } else if (formula && formula.defesa) {
+                defenseConfig = formula.defesa;
+              }
+            } catch (e) { defenseConfig = null; }
+
+            // compute passive defense
+            const attrMap = { forca: Number(attr.forca||0), agilidade: Number(attr.agilidade||0), intelecto: Number(attr.intelecto||0), vigor: Number(attr.vigor||0), presenca: Number(attr.presenca||0) };
+            const passiveAttr = (defenseConfig && defenseConfig.passive && defenseConfig.passive.attribute) ? defenseConfig.passive.attribute : 'agilidade';
+            const passive_base = 10 + (attrMap[passiveAttr] || 0);
+            const passive_mods = sumModifiers((defenseConfig && defenseConfig.passive && (defenseConfig.passive.modifiers || [])) || []);
+            const defesa_passiva = Math.max(0, passive_base + passive_mods);
+
+            // compute esquiva (dodge): passive + pericia bonus (if trained)
+            let esquivaVal = 0;
+            try {
+              const dodgeCfg = (defenseConfig && defenseConfig.dodge) || null;
+              if (dodgeCfg && dodgeCfg.skill) {
+                const per = (features && features.pericia) ? features.pericia.find(p=>p.name === dodgeCfg.skill) : null;
+                const trained = per && per.training_level && per.training_level !== 'none';
+                const perTotal = per ? Number(per.total||0) : 0;
+                const dodgeMods = sumModifiers((dodgeCfg && dodgeCfg.modifiers) || []);
+                if (trained) {
+                  esquivaVal = Math.max(0, defesa_passiva + perTotal + dodgeMods);
+                } else esquivaVal = 0;
+              }
+            } catch (e) { esquivaVal = 0; }
+
+            // compute bloqueio (block): total bonus of a skill + modifiers
+            let bloqueioVal = 0;
+            try {
+              const blockCfg = (defenseConfig && defenseConfig.block) || null;
+              if (blockCfg && blockCfg.skill) {
+                const perB = (features && features.pericia) ? features.pericia.find(p=>p.name === blockCfg.skill) : null;
+                const perTotalB = perB ? Number(perB.total||0) : 0;
+                const blockMods = sumModifiers((blockCfg && blockCfg.modifiers) || []);
+                bloqueioVal = Math.max(0, perTotalB + blockMods);
+              }
+            } catch (e) { bloqueioVal = 0; }
+
+            return { vida_max: vidaMax, esforco_max: esforcoMax, sanidade_max: sanidadeMax, defesa_passiva: defesa_passiva, esquiva: esquivaVal, bloqueio: bloqueioVal };
           };
 
           const ClassModel = require('../models/classModel');
@@ -118,6 +162,10 @@ const CharacterService = {
                         character.vida_max = computed.vida_max;
                         character.esforco_max = computed.esforco_max;
                         character.sanidade_max = computed.sanidade_max;
+                        // attach computed defense fields so client receives them on full fetch
+                        character.defesa_passiva = computed.defesa_passiva || 0;
+                        character.esquiva = computed.esquiva || 0;
+                        character.bloqueio = computed.bloqueio || 0;
 
                         return callback(null, {
                           character,
@@ -257,9 +305,72 @@ const CharacterService = {
           const esforcoMax = Math.max(0, (effort_initial + presenca) + ((effort_per_level + presenca) * Math.max(0, (nivel - 1))) + (esforco_per_level_mod * nivel) + esforco_flat_mod);
           const sanidadeMax = Math.max(0, sanity_initial + (sanity_per_level * Math.max(0, (nivel - 1))) + (sanidade_per_level_mod * nivel) + sanidade_flat_mod);
 
-          CharacterModel.updateMaxStats(characterId, vidaMax, esforcoMax, sanidadeMax, (err3) => {
-            if (err3) return callback(err3);
-            return callback(null, { vida_max: vidaMax, esforco_max: esforcoMax, sanidade_max: sanidadeMax });
+          // compute defenses similarly to computeMaxFromClass
+          const parseFormulaLocal = (raw) => {
+            if (!raw) return null;
+            if (typeof raw === 'object') return raw;
+            try { return JSON.parse(raw); } catch (e) { return null; }
+          };
+
+          const formulaObj = parseFormulaLocal(character.status_formula);
+          let defenseConfig = null;
+          try {
+            if (character.defense_formula) {
+              defenseConfig = typeof character.defense_formula === 'string' ? JSON.parse(character.defense_formula) : character.defense_formula;
+            } else if (formulaObj && formulaObj.defesa) {
+              defenseConfig = formulaObj.defesa;
+            }
+          } catch (e) { defenseConfig = null; }
+
+          const sumModifiersLocal = (mods) => { if (!mods || !Array.isArray(mods)) return 0; return mods.reduce((s,m)=>s + (Number(m && m.value) || 0), 0); };
+          const attrMapLocal = { forca: Number(attr.forca||0), agilidade: Number(attr.agilidade||0), intelecto: Number(attr.intelecto||0), vigor: Number(attr.vigor||0), presenca: Number(attr.presenca||0) };
+
+          const passiveAttr = (defenseConfig && defenseConfig.passive && defenseConfig.passive.attribute) ? defenseConfig.passive.attribute : 'agilidade';
+          const passive_base = 10 + (attrMapLocal[passiveAttr] || 0);
+          const passive_mods = sumModifiersLocal((defenseConfig && defenseConfig.passive && (defenseConfig.passive.modifiers || [])) || []);
+          const defesa_passiva = Math.max(0, passive_base + passive_mods);
+
+          // need character features to compute pericia totals: fetch them
+          FeatureService.getCharacterFeaturesGrouped(characterId, (errF, feats) => {
+            if (errF) {
+              // still update max stats and passive only
+              CharacterModel.updateMaxAndDefenses(characterId, vidaMax, esforcoMax, sanidadeMax, defesa_passiva, 0, 0, (err3) => {
+                if (err3) return callback(err3);
+                return callback(null, { vida_max: vidaMax, esforco_max: esforcoMax, sanidade_max: sanidadeMax, defesa_passiva });
+              });
+              return;
+            }
+
+            const featuresGrouped = feats || {};
+            // dodge
+            let esquivaVal = 0;
+            try {
+              const dodgeCfg = (defenseConfig && defenseConfig.dodge) || null;
+              if (dodgeCfg && dodgeCfg.skill) {
+                const per = (featuresGrouped && featuresGrouped.pericia) ? featuresGrouped.pericia.find(p=>p.name === dodgeCfg.skill) : null;
+                const trained = per && per.training_level && per.training_level !== 'none';
+                const perTotal = per ? Number(per.total||0) : 0;
+                const dodgeMods = sumModifiersLocal((dodgeCfg && dodgeCfg.modifiers) || []);
+                if (trained) esquivaVal = Math.max(0, defesa_passiva + perTotal + dodgeMods);
+              }
+            } catch (e) { esquivaVal = 0; }
+
+            // block
+            let bloqueioVal = 0;
+            try {
+              const blockCfg = (defenseConfig && defenseConfig.block) || null;
+              if (blockCfg && blockCfg.skill) {
+                const perB = (featuresGrouped && featuresGrouped.pericia) ? featuresGrouped.pericia.find(p=>p.name === blockCfg.skill) : null;
+                const perTotalB = perB ? Number(perB.total||0) : 0;
+                const blockMods = sumModifiersLocal((blockCfg && blockCfg.modifiers) || []);
+                bloqueioVal = Math.max(0, perTotalB + blockMods);
+              }
+            } catch (e) { bloqueioVal = 0; }
+
+            CharacterModel.updateMaxAndDefenses(characterId, vidaMax, esforcoMax, sanidadeMax, defesa_passiva, esquivaVal, bloqueioVal, (err3) => {
+              if (err3) return callback(err3);
+              return callback(null, { vida_max: vidaMax, esforco_max: esforcoMax, sanidade_max: sanidadeMax, defesa_passiva, esquiva: esquivaVal, bloqueio: bloqueioVal });
+            });
           });
         };
 

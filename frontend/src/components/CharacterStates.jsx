@@ -118,7 +118,23 @@ export default function CharacterStates({ character }) {
         <div className="mt-3 grid grid-cols-2 gap-3">
           <div className="bg-white/2 rounded p-3 text-center">
             <div className="text-sm text-gray-400">Limite de gasto de PE</div>
-            <div className="text-3xl font-extrabold mt-2">{character?.nivel ?? character?.level ?? '-'}</div>
+            <div className="text-3xl font-extrabold mt-2">
+              {
+                // prefer server-calculated value if present
+                (character && (character.pe_limit || character.peLimit || character.computed?.pe_limit))
+                || (() => {
+                  const lvl = Number(character?.nivel ?? character?.level ?? 0) || 0;
+                  try {
+                    const def = character && character.defense_formula ? (typeof character.defense_formula === 'string' ? JSON.parse(character.defense_formula) : character.defense_formula) : (character && character.defesa ? (typeof character.defesa === 'string' ? JSON.parse(character.defesa) : character.defesa) : null);
+                    const mods = def && def.pe_limit && Array.isArray(def.pe_limit.modifiers) ? def.pe_limit.modifiers : [];
+                    const sum = (mods || []).reduce((acc, m) => acc + (Number(m && m.value) || 0), 0);
+                    return (lvl + sum) || '-';
+                  } catch (e) {
+                    return lvl || '-';
+                  }
+                })()
+              }
+            </div>
           </div>
 
           <div>

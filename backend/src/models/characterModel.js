@@ -118,6 +118,12 @@ CharacterModel.update = (id, data, callback) => {
   db.query(sql, values, callback);
 };
 
+// update max stats and defenses for a character
+CharacterModel.updateMaxAndDefenses = (id, vidaMax, esforcoMax, sanidadeMax, defesaPassiva, esquivaVal, bloqueioVal, callback) => {
+  const sql = `UPDATE characters SET vida_max = ?, esforco_max = ?, sanidade_max = ?, defesa_passiva = ?, esquiva = ?, bloqueio = ? WHERE id = ?`;
+  db.query(sql, [vidaMax || 0, esforcoMax || 0, sanidadeMax || 0, defesaPassiva || 0, esquivaVal || 0, bloqueioVal || 0, id], callback);
+};
+
 // update proficiencies text field
 CharacterModel.updateProficiencies = (id, proficiencies, prestigio, patente, callback) => {
   const sql = `UPDATE characters SET proficiencias = ?, prestigio = ?, patente = ? WHERE id = ?`;
@@ -164,7 +170,8 @@ CharacterModel.updateDetails = (id, data, callback) => {
       afinidade = ?,
       imagem_perfil = ?,
       imagem_token = ?,
-      status_formula = ?
+        status_formula = ?,
+        defense_formula = ?
     WHERE id = ?
   `;
 
@@ -183,7 +190,8 @@ CharacterModel.updateDetails = (id, data, callback) => {
     data.afinidade || null,
     data.imagem_perfil || null,
     data.imagem_token || null,
-    (data.status_formula !== undefined && data.status_formula !== null) ? JSON.stringify(data.status_formula) : null,
+      (data.status_formula !== undefined && data.status_formula !== null) ? JSON.stringify(data.status_formula) : null,
+      (data.defense_formula !== undefined && data.defense_formula !== null) ? JSON.stringify(data.defense_formula) : null,
     id
   ];
 

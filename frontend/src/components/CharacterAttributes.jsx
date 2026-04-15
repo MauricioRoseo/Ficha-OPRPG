@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import overlayImg from "../assets/images/attributes/overlay.png";
 
-export default function CharacterAttributes({ character, attributes }) {
+export default function CharacterAttributes({ character, attributes, editable = false, onChangeAttribute }) {
   const attrs = attributes || character || {};
   const cardRef = useRef(null);
   const [showImg, setShowImg] = useState(true);
@@ -51,23 +51,68 @@ export default function CharacterAttributes({ character, attributes }) {
           {/* Absolute positioned small boxes placed to align with the overlay image.
               Tweak positions in globals.css (.atributo-pos-*) if needed. */}
           <div className="atributo-pos atributo-pos-agi">
-            <div className="atributo-value small">{attrs.agilidade ?? attrs.AGI ?? "-"}</div>
+            {editable ? (
+              <input
+                type="number"
+                className="atributo-value small"
+                value={attrs.agilidade ?? attrs.AGI ?? ''}
+                onChange={e => onChangeAttribute && onChangeAttribute('agilidade', e.target.value)}
+              />
+            ) : (
+              <div className="atributo-value small">{attrs.agilidade ?? attrs.AGI ?? "-"}</div>
+            )}
           </div>
 
           <div className="atributo-pos atributo-pos-for">
-            <div className="atributo-value small">{attrs.forca ?? attrs.FOR ?? "-"}</div>
+            {editable ? (
+              <input
+                type="number"
+                className="atributo-value small"
+                value={attrs.forca ?? attrs.FOR ?? ''}
+                onChange={e => onChangeAttribute && onChangeAttribute('forca', e.target.value)}
+              />
+            ) : (
+              <div className="atributo-value small">{attrs.forca ?? attrs.FOR ?? "-"}</div>
+            )}
           </div>
 
           <div className="atributo-pos atributo-pos-int">
-            <div className="atributo-value small">{attrs.inteleto ?? attrs.INT ?? attrs.intelecto ?? "-"}</div>
+            {editable ? (
+              <input
+                type="number"
+                className="atributo-value small"
+                value={attrs.intelecto ?? attrs.INT ?? attrs.inteleto ?? ''}
+                onChange={e => onChangeAttribute && onChangeAttribute('intelecto', e.target.value)}
+              />
+            ) : (
+              <div className="atributo-value small">{attrs.inteleto ?? attrs.INT ?? attrs.intelecto ?? "-"}</div>
+            )}
           </div>
 
           <div className="atributo-pos atributo-pos-pre">
-            <div className="atributo-value small">{attrs.presenca ?? attrs.PRE ?? "-"}</div>
+            {editable ? (
+              <input
+                type="number"
+                className="atributo-value small"
+                value={attrs.presenca ?? attrs.PRE ?? ''}
+                onChange={e => onChangeAttribute && onChangeAttribute('presenca', e.target.value)}
+              />
+            ) : (
+              <div className="atributo-value small">{attrs.presenca ?? attrs.PRE ?? "-"}</div>
+            )}
           </div>
 
           <div className="atributo-pos atributo-pos-vig">
-            <div className="atributo-value small">{attrs.vigor ?? attrs.VIG ?? "-"}</div>
+            {editable ? (
+              <input
+                type="number"
+                className="atributo-value small"
+                value={attrs.vigor ?? attrs.VIG ?? ''}
+                onChange={e => onChangeAttribute && onChangeAttribute('vigor', e.target.value)}
+              />
+            ) : (
+              <div className="atributo-value small">{attrs.vigor ?? attrs.VIG ?? "-"}</div>
+            )}
           </div>
         </div>
       </div>

@@ -131,6 +131,21 @@ const FeatureModel = {
     db.query(sql, [id], callback);
   }
 
+  ,
+
+  updateCharacterFeature: (id, data, callback) => {
+    const sql = `UPDATE character_features SET value = ?, training_level = ?, extra = ?, notes = ?, encumbrance_penalty = ? WHERE id = ?`;
+    const values = [
+      data.value || 0,
+      data.training_level || 'none',
+      data.extra || 0,
+      data.notes || null,
+      (data.has_encumbrance_penalty ? (data.encumbrance_penalty || 0) : null),
+      id
+    ];
+    db.query(sql, values, callback);
+  }
+
 };
 
 module.exports = FeatureModel;

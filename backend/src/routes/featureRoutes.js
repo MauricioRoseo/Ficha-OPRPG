@@ -13,6 +13,7 @@ router.post('/:characterId/:featureId', authMiddleware, FeatureController.addToC
 
 // listar features do personagem
 router.get('/character/:characterId', authMiddleware, FeatureController.getByCharacter);
+router.put('/character/:characterId/:id', authMiddleware, FeatureController.updateCharacterFeature);
 router.delete('/character/:characterId/:id', authMiddleware, FeatureController.removeFromCharacter);
 
 module.exports = router;

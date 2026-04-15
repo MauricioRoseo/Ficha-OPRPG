@@ -30,3 +30,47 @@ ResistanceModel.incrementPhysical = (characterId, delta, callback) => {
 };
 
 module.exports = ResistanceModel;
+
+// update full resistances row for a character (replace values)
+ResistanceModel.updateByCharacterId = (characterId, data, callback) => {
+  const sql = `UPDATE resistances SET
+    acid = ?,
+    balistico = ?,
+    corte = ?,
+    eletricidade = ?,
+    fogo = ?,
+    frio = ?,
+    impacto = ?,
+    mental = ?,
+    perfuracao = ?,
+    veneno = ?,
+    conhecimento = ?,
+    energia = ?,
+    sangue = ?,
+    morte = ?
+    WHERE character_id = ?`;
+
+  const values = [
+    Number(data.acid || 0),
+    Number(data.balistico || 0),
+    Number(data.corte || 0),
+    Number(data.eletricidade || 0),
+    Number(data.fogo || 0),
+    Number(data.frio || 0),
+    Number(data.impacto || 0),
+    Number(data.mental || 0),
+    Number(data.perfuracao || 0),
+    Number(data.veneno || 0),
+    Number(data.conhecimento || 0),
+    Number(data.energia || 0),
+    Number(data.sangue || 0),
+    Number(data.morte || 0),
+    characterId
+  ];
+
+  db.query(sql, values, (err, result) => {
+    if (err) return callback(err);
+    // return updated row
+    ResistanceModel.findByCharacterId(characterId, callback);
+  });
+};

@@ -1,15 +1,51 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import ProtectionFormModal from "./ProtectionFormModal";
 import ProtectionTemplatesModal from "./ProtectionTemplatesModal";
 
-export default function ProtectionsPanel({ character, attributes, protections: initialProtections, resistances = {}, onCharacterUpdate, onResistancesUpdate }) {
+export default function ProtectionsPanel({ character, attributes, protections: initialProtections, resistances = {}, onCharacterUpdate, onResistancesUpdate, editable = false }) {
   const data = attributes || character || {};
   const [protections, setProtections] = useState(initialProtections || []);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const [showAddModal, setShowAddModal] = useState(false);
   const [showTemplates, setShowTemplates] = useState(false);
+  const [editingProtection, setEditingProtection] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [localResistances, setLocalResistances] = useState(resistances || {});
+  const saveTimer = useRef(null);
+
+  useEffect(() => {
+    setLocalResistances(resistances || {});
+  }, [resistances]);
+
+  // save local resistances to backend (debounced)
+  const scheduleSaveResistances = (next) => {
+    setLocalResistances(next);
+    if (!character || !character.id) return;
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const res = await fetch(`http://localhost:3001/resistances/${character.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': token ? `Bearer ${token}` : '' },
+          body: JSON.stringify(next)
+        });
+        if (res.ok) {
+          const j = await res.json();
+          const updated = j.resistances || next;
+          setLocalResistances(updated);
+          if (onResistancesUpdate) onResistancesUpdate(updated);
+        } else {
+          // keep local state but log
+          try { const j = await res.json(); console.error('Erro ao salvar resistências', j); } catch(e) { console.error('Erro ao salvar resistências'); }
+        }
+      } catch (e) {
+        console.error('Erro ao salvar resistências', e);
+      }
+    }, 800);
+  };
 
   const toggleEquipped = async (protId, currentlyEquipped) => {
     // optimistic update
@@ -63,6 +99,19 @@ export default function ProtectionsPanel({ character, attributes, protections: i
     }
   };
 
+  const handleUpdated = (updatedProt) => {
+    // update in list
+    setProtections(prev => prev.map(p => p.id === updatedProt.id ? { ...p, ...updatedProt } : p));
+    if (updatedProt && updatedProt.defesa_passiva !== undefined && onCharacterUpdate) {
+      onCharacterUpdate(prev => ({ ...prev, defesa_passiva: updatedProt.defesa_passiva }));
+    }
+    if (updatedProt && updatedProt.resistances && onResistancesUpdate) {
+      onResistancesUpdate(updatedProt.resistances);
+    }
+    setShowEditModal(false);
+    setEditingProtection(null);
+  };
+
   return (
     <div>
       <div className="mb-3 stat-label">Proteções & Resistências</div>
@@ -102,6 +151,9 @@ export default function ProtectionsPanel({ character, attributes, protections: i
                     <td className="py-2">{p.damage_resistance ?? 0}</td>
                     <td className="py-2">{p.encumbrance_penalty ?? 0}</td>
                     <td className="py-2 text-right">
+                      <button onClick={() => { setEditingProtection(p); setShowEditModal(true); }} className="mr-2 text-gray-300 hover:text-white" title="Editar">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>
+                      </button>
                       <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-500" title="Remover">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
                       </button>
@@ -129,7 +181,14 @@ export default function ProtectionsPanel({ character, attributes, protections: i
               ['veneno', 'Veneno']
             ].map(([key, label]) => (
               <div key={key} className="bg-white/3 rounded p-2 text-center">
-                <div className="text-lg font-bold">{resistances[key] ?? 0}</div>
+                {editable ? (
+                  <input min={0} type="number" value={localResistances[key] ?? 0} onChange={(e)=>{
+                    const next = { ...(localResistances || {}), [key]: Number(e.target.value || 0) };
+                    scheduleSaveResistances(next);
+                  }} className="w-full text-lg font-bold bg-transparent text-center" />
+                ) : (
+                  <div className="text-lg font-bold">{resistances[key] ?? 0}</div>
+                )}
                 <div className="text-xs text-gray-300">{label}</div>
               </div>
             ))}
@@ -144,7 +203,14 @@ export default function ProtectionsPanel({ character, attributes, protections: i
               ['conhecimento', 'Conhecimento']
             ].map(([key, label]) => (
               <div key={key} className="bg-white/3 rounded p-2 text-center">
-                <div className="text-lg font-bold">{resistances[key] ?? 0}</div>
+                {editable ? (
+                  <input min={0} type="number" value={localResistances[key] ?? 0} onChange={(e)=>{
+                    const next = { ...(localResistances || {}), [key]: Number(e.target.value || 0) };
+                    scheduleSaveResistances(next);
+                  }} className="w-full text-lg font-bold bg-transparent text-center" />
+                ) : (
+                  <div className="text-lg font-bold">{resistances[key] ?? 0}</div>
+                )}
                 <div className="text-xs text-gray-300">{label}</div>
               </div>
             ))}
@@ -172,6 +238,7 @@ export default function ProtectionsPanel({ character, attributes, protections: i
           console.error(e);
         }
       }} />
+        <ProtectionFormModal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setEditingProtection(null); }} onSaved={handleUpdated} initial={editingProtection} characterId={character?.id} />
     </div>
   );
 }
