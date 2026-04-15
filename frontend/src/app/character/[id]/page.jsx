@@ -14,6 +14,7 @@ import ProficienciesPanel from "../../../components/ProficienciesPanel";
 import InventoryPanel from "../../../components/InventoryPanel";
 import SkillsPanel from "../../../components/SkillsPanel";
 import RituaisPanel from "../../../components/RituaisPanel";
+// Image modal removed from view page — editing handled on the edit route
 
 export default function CharacterPage() {
   const params = useParams();
@@ -35,6 +36,7 @@ export default function CharacterPage() {
   const [editingNote, setEditingNote] = useState(null);
   const [noteTitle, setNoteTitle] = useState("");
   const [noteContent, setNoteContent] = useState("");
+  // modal state removed from view page; edit page handles image editing
 
   useEffect(() => {
     if (!id) return;
@@ -247,9 +249,19 @@ export default function CharacterPage() {
           <div className="w-full md:w-1/3 flex-shrink-0 bg-[#021018] flex items-center justify-center">
             <div className="w-full max-w-[420px] aspect-square">
               {character.imagem_perfil ? (
-                <img src={character.imagem_perfil} alt={character.name} className="w-full h-full object-cover rounded-t-lg md:rounded-l-lg" />
+                <img
+                  src={character.imagem_perfil}
+                  alt={character.name}
+                  className="w-full h-full object-cover rounded-t-lg md:rounded-l-lg cursor-pointer"
+                  onClick={() => router.push(`/character/${id}/edit`)}
+                />
               ) : (
-                <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">SEM IMAGEM</div>
+                <div
+                  className="w-full h-full flex items-center justify-center text-xs text-gray-500 cursor-pointer"
+                  onClick={() => router.push(`/character/${id}/edit`)}
+                >
+                  SEM IMAGEM
+                </div>
               )}
             </div>
           </div>
@@ -318,9 +330,19 @@ export default function CharacterPage() {
               <div className="flex items-center justify-center">
                 <div className="w-full max-w-[220px] aspect-[2/3] border border-white/10 bg-[#021018]">
                   {character.imagem_token ? (
-                    <img src={character.imagem_token} alt="token" className="w-full h-full object-cover" />
+                    <img
+                      src={character.imagem_token}
+                      alt="token"
+                      className="w-full h-full object-cover cursor-pointer"
+                      onClick={() => router.push(`/character/${id}/edit`)}
+                    />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">TOKEN</div>
+                    <div
+                      className="w-full h-full flex items-center justify-center text-xs text-gray-500 cursor-pointer"
+                      onClick={() => router.push(`/character/${id}/edit`)}
+                    >
+                      TOKEN
+                    </div>
                   )}
                 </div>
               </div>
@@ -567,6 +589,11 @@ export default function CharacterPage() {
       )}
 
       {/* As sections da ficha agora são renderizadas dentro da aba ativa (veja abaixo). */}
+
+      {/* ImageModal removed from view page; editing happens on the edit route */}
+
     </div>
   );
 }
+
+// Modal render placed outside to keep main return tidy

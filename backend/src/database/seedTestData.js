@@ -171,6 +171,23 @@ const seed = async () => {
 
     console.log('✔ Atributos criados para personagens de exemplo');
 
+    // set default status_formula JSON for created characters (empty modifiers)
+    const defaultFormula = JSON.stringify({
+      vida: { modifiers_per_level: [], modifiers_flat: [] },
+      esforco: { modifiers_per_level: [], modifiers_flat: [] },
+      sanidade: { modifiers_per_level: [], modifiers_flat: [] }
+    });
+
+    const setFormulaFor = async (charId) => {
+      if (!charId) return;
+      await query(`UPDATE characters SET status_formula = ? WHERE id = ?`, [defaultFormula, charId]);
+    };
+
+    await setFormulaFor(c1);
+    await setFormulaFor(c2);
+    await setFormulaFor(c3);
+    await setFormulaFor(c4);
+
     // buscar features base
     const features = await query(`SELECT * FROM features`);
 
@@ -255,6 +272,9 @@ const seed = async () => {
     // create tabs for additional characters
     await createTabs(c5);
     await createTabs(c6);
+    // apply default status_formula for the new characters
+    await setFormulaFor(c5);
+    await setFormulaFor(c6);
 
     // criar alguns itens de preset no catálogo (se ainda não existirem)
     const createCatalogItem = async (name, description, space, category) => {
@@ -349,6 +369,16 @@ const seed = async () => {
         }
       }
 
+      // update inserted classes with template defaults (hp/effort/sanity and choices)
+      const setDefaults = async (name, hpInit, hpPer, efInit, efPer, saInit, saPer, choiceCount, desc) => {
+        await query(`UPDATE classes SET description = ?, hp_initial = ?, hp_per_level = ?, effort_initial = ?, effort_per_level = ?, sanity_initial = ?, sanity_per_level = ?, choice_skills_count = ? WHERE name = ?`, [desc || null, hpInit, hpPer, efInit, efPer, saInit, saPer, choiceCount, name]);
+      };
+
+      await setDefaults('Combatente', 20, 6, 2, 1, 6, 1, 1, 'Classe focada em combate direto, com alta durabilidade.');
+      await setDefaults('Infiltrador', 14, 4, 3, 1, 8, 1, 2, 'Especialista em furtividade e manobras.');
+      await setDefaults('Especialista', 12, 3, 2, 1, 10, 1, 3, 'Perito em conhecimentos e perícias variadas.');
+      await setDefaults('Healer', 10, 3, 2, 1, 12, 2, 1, 'Suporte com foco em cura e proteção.');
+
       // trails for Combatente
       const cls = await query(`SELECT id FROM classes WHERE name = 'Combatente' LIMIT 1`);
       if (cls && cls.length > 0) {
@@ -370,6 +400,83 @@ const seed = async () => {
       if (!existOrigin || existOrigin.length === 0) {
         await query(`INSERT INTO origins (name, description, pericia_1_id, pericia_2_id, habilidade_id) VALUES (?, ?, ?, ?, ?)`, ['Distrito 7', 'Origem urbana, bairro operário do distrito 7.', p1 ? p1.id : null, p2 ? p2.id : null, hab ? hab.id : null]);
         console.log('✔ Origem de exemplo criada: Distrito 7');
+      }
+
+      // --- vincular exemplos para classes: perícias treinadas, proficiências e habilidades ---
+      const getClassId = async (name) => {
+        const r = await query(`SELECT id FROM classes WHERE name = ? LIMIT 1`, [name]);
+        return r && r.length > 0 ? r[0].id : null;
+      };
+
+      const insertIfNotExists = async (table, whereCols, values) => {
+        // whereCols: {col: value}
+        const whereParts = Object.keys(whereCols).map(c => `${c} = ?`).join(' AND ');
+        const whereVals = Object.values(whereCols);
+        const exists = await query(`SELECT id FROM ${table} WHERE ${whereParts} LIMIT 1`, whereVals);
+        if (exists && exists.length > 0) return exists[0].id;
+        const cols = Object.keys(whereCols).concat(Object.keys(values || {}));
+        const vals = Object.values(whereCols).concat(Object.values(values || {}));
+        const placeholders = cols.map(()=>'?').join(', ');
+        const sql = `INSERT INTO ${table} (${cols.join(', ')}) VALUES (${placeholders})`;
+        const res = await query(sql, vals);
+        return res.insertId;
+      };
+
+      // gather some features to link
+      const featLuta = findFeat('Luta');
+      const featProtecao = findFeat('Proteção');
+      const featAprimorar = findFeat('Aprimorar Arma');
+      const featFurtividade = findFeat('Furtividade');
+      const featPercepcao = findFeat('Percepção');
+      const featInvestigacao = findFeat('Investigação');
+      const featPersuasao = findFeat('Persuasão');
+      const featCuraRapida = findFeat('Cura Rápida');
+      const featCicatriz = findFeat('Cicatrização');
+
+      // Combatente
+      const combatenteId = await getClassId('Combatente');
+      if (combatenteId) {
+        if (featLuta) await insertIfNotExists('class_trained_skills', { class_id: combatenteId, feature_id: featLuta.id });
+        if (featProtecao) await insertIfNotExists('class_abilities', { class_id: combatenteId, feature_id: featProtecao.id }, { min_level: 1 });
+        await insertIfNotExists('class_proficiencies', { class_id: combatenteId, name: 'Armas corpo-a-corpo' });
+        await insertIfNotExists('class_proficiencies', { class_id: combatenteId, name: 'Armaduras médias' });
+      }
+
+      // Infiltrador
+      const infilId = await getClassId('Infiltrador');
+      if (infilId) {
+        if (featFurtividade) await insertIfNotExists('class_trained_skills', { class_id: infilId, feature_id: featFurtividade.id });
+        if (featPercepcao) await insertIfNotExists('class_trained_skills', { class_id: infilId, feature_id: featPercepcao.id });
+        await insertIfNotExists('class_proficiencies', { class_id: infilId, name: 'Armas pequenas' });
+        if (featAprimorar) await insertIfNotExists('class_abilities', { class_id: infilId, feature_id: featAprimorar.id }, { min_level: 8 });
+      }
+
+      // Especialista
+      const espeId = await getClassId('Especialista');
+      if (espeId) {
+        if (featInvestigacao) await insertIfNotExists('class_trained_skills', { class_id: espeId, feature_id: featInvestigacao.id });
+        if (featPersuasao) await insertIfNotExists('class_trained_skills', { class_id: espeId, feature_id: featPersuasao.id });
+        await insertIfNotExists('class_proficiencies', { class_id: espeId, name: 'Ferramentas de perícia' });
+        if (featAprimorar) await insertIfNotExists('class_abilities', { class_id: espeId, feature_id: featAprimorar.id }, { min_level: 13 });
+      }
+
+      // Healer
+      const healerId = await getClassId('Healer');
+      if (healerId) {
+        if (featCuraRapida) await insertIfNotExists('class_trained_skills', { class_id: healerId, feature_id: featCuraRapida.id });
+        if (featCicatriz) await insertIfNotExists('class_trained_skills', { class_id: healerId, feature_id: featCicatriz.id });
+        await insertIfNotExists('class_proficiencies', { class_id: healerId, name: 'Medicina' });
+        if (featProtecao) await insertIfNotExists('class_abilities', { class_id: healerId, feature_id: featProtecao.id }, { min_level: 2 });
+      }
+
+      // Trail abilities example: for Combatente.Soldado
+      const soldado = await query(`SELECT id FROM trails WHERE name = ? LIMIT 1`, ['Soldado']);
+      if (soldado && soldado.length > 0) {
+        const trailId = soldado[0].id;
+        if (featProtecao) await insertIfNotExists('trail_abilities', { trail_id: trailId, level: 2, feature_id: featProtecao.id });
+        if (featAprimorar) await insertIfNotExists('trail_abilities', { trail_id: trailId, level: 8, feature_id: featAprimorar.id });
+        if (featLuta) await insertIfNotExists('trail_abilities', { trail_id: trailId, level: 13, feature_id: featLuta.id });
+        if (featPercepcao) await insertIfNotExists('trail_abilities', { trail_id: trailId, level: 20, feature_id: featPercepcao.id });
       }
     };
 

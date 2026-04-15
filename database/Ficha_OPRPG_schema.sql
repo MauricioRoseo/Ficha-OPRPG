@@ -70,6 +70,8 @@ CREATE TABLE IF NOT EXISTS characters (
     carga_atual INT DEFAULT 0,
     carga_maxima INT DEFAULT 0,
 
+    status_formula JSON DEFAULT NULL,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -358,8 +360,18 @@ CREATE TABLE IF NOT EXISTS character_backgrounds (
 CREATE TABLE IF NOT EXISTS classes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(150) NOT NULL,
+    description TEXT DEFAULT NULL,
+    hp_initial INT DEFAULT 0,
+    hp_per_level INT DEFAULT 0,
+    effort_initial INT DEFAULT 0,
+    effort_per_level INT DEFAULT 0,
+    sanity_initial INT DEFAULT 0,
+    sanity_per_level INT DEFAULT 0,
+    choice_skills_count INT DEFAULT 0,
+    proficiencies JSON DEFAULT NULL,
+    metadata JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS trails (
     id INT AUTO_INCREMENT PRIMARY KEY,
@@ -369,6 +381,47 @@ CREATE TABLE IF NOT EXISTS trails (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
 );
+
+-- Class trained skills (links classes to skill features)
+CREATE TABLE IF NOT EXISTS class_trained_skills (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    class_id INT NOT NULL,
+    feature_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+    FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Class abilities: links a class to many ability features (optionally tied to a minimum level)
+CREATE TABLE IF NOT EXISTS class_abilities (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    class_id INT NOT NULL,
+    feature_id INT NOT NULL,
+    min_level INT DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE,
+    FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Class proficiencies (free-text or controlled names stored per class)
+CREATE TABLE IF NOT EXISTS class_proficiencies (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    class_id INT NOT NULL,
+    name VARCHAR(150) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Trail abilities (link a trail to a feature at a specific milestone level)
+CREATE TABLE IF NOT EXISTS trail_abilities (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    trail_id INT NOT NULL,
+    level INT NOT NULL,
+    feature_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (trail_id) REFERENCES trails(id) ON DELETE CASCADE,
+    FOREIGN KEY (feature_id) REFERENCES features(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- Origins: each origin links to two pericias (features.type='pericia') and one habilidade (features.type='habilidade')
 CREATE TABLE IF NOT EXISTS origins (

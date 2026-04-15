@@ -138,6 +138,12 @@ CharacterModel.setCarga = (id, cargaAtual, cargaMaxima, callback) => {
   db.query(sql, [cargaAtual || 0, cargaMaxima || 0, id], callback);
 };
 
+// update computed max stats for a character
+CharacterModel.updateMaxStats = (id, vidaMax, esforcoMax, sanidadeMax, callback) => {
+  const sql = `UPDATE characters SET vida_max = ?, esforco_max = ?, sanidade_max = ? WHERE id = ?`;
+  db.query(sql, [vidaMax || 0, esforcoMax || 0, sanidadeMax || 0, id], callback);
+};
+
 // update basic character details (profile/configuration fields)
 CharacterModel.updateDetails = (id, data, callback) => {
   // Note: patente should not be directly editable here (computed from prestigio).
@@ -157,7 +163,8 @@ CharacterModel.updateDetails = (id, data, callback) => {
       prestigio = ?,
       afinidade = ?,
       imagem_perfil = ?,
-      imagem_token = ?
+      imagem_token = ?,
+      status_formula = ?
     WHERE id = ?
   `;
 
@@ -176,6 +183,7 @@ CharacterModel.updateDetails = (id, data, callback) => {
     data.afinidade || null,
     data.imagem_perfil || null,
     data.imagem_token || null,
+    (data.status_formula !== undefined && data.status_formula !== null) ? JSON.stringify(data.status_formula) : null,
     id
   ];
 

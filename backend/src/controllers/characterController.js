@@ -232,8 +232,17 @@ CharacterController.updateDetails = (req, res) => {
     const validateAndUpdate = () => {
       CharacterModel.updateDetails(id, payload, (err2, result) => {
         if (err2) return res.status(500).json(err2);
-        // return updated fields back to client
-        res.json({ message: 'Detalhes atualizados' });
+        // after updating details, recalculate max stats based on new class/level/formula
+        const CharacterService = require('../services/characterService');
+        CharacterService.recalculateStatusMax(id, (err3, stats) => {
+          if (err3) {
+            // log error but still return success for details update
+            console.warn('Erro ao recalcular status:', err3 && err3.message ? err3.message : err3);
+            return res.json({ message: 'Detalhes atualizados' });
+          }
+          // return updated fields back to client including computed max stats
+          res.json({ message: 'Detalhes atualizados', computed: stats });
+        });
       });
     };
 

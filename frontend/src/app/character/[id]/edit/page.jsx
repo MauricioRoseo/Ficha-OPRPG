@@ -3,6 +3,8 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import FichaPaper from "../../../../components/FichaPaper";
+import ImageModal from "../../../../components/ImageModal";
+import StatusFormulaModal from "../../../../components/StatusFormulaModal";
 import StatusSection from "../../../../components/StatusSection";
 import CharacterStates from "../../../../components/CharacterStates";
 import CharacterAttributes from "../../../../components/CharacterAttributes";
@@ -35,6 +37,8 @@ export default function CharacterEditPage() {
   const [trailsList, setTrailsList] = useState([]);
   const [originsList, setOriginsList] = useState([]);
   const [showImageEditor, setShowImageEditor] = useState(false);
+  const [imageEditorType, setImageEditorType] = useState(null); // 'perfil' | 'token'
+  const [showFormulaModal, setShowFormulaModal] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -82,6 +86,8 @@ export default function CharacterEditPage() {
           afinidade: (data.character && data.character.afinidade) || '',
           imagem_perfil: (data.character && data.character.imagem_perfil) || '',
           imagem_token: (data.character && data.character.imagem_token) || ''
+          ,
+          status_formula: (data.character && data.character.status_formula) ? (typeof data.character.status_formula === 'string' ? JSON.parse(data.character.status_formula) : data.character.status_formula) : null
         });
         setAttributes(data.attributes || {});
         setProtections(data.protections || []);
@@ -142,7 +148,8 @@ export default function CharacterEditPage() {
           prestigio: form.prestigio === '' ? null : (isNaN(Number(form.prestigio)) ? form.prestigio : Number(form.prestigio)),
           afinidade: form.afinidade,
           imagem_perfil: form.imagem_perfil,
-          imagem_token: form.imagem_token
+          imagem_token: form.imagem_token,
+          status_formula: form.status_formula || null
         };
 
         const res = await fetch(`http://localhost:3001/characters/${id}/details`, {
@@ -206,6 +213,13 @@ export default function CharacterEditPage() {
               >
                 Voltar à visualização
               </button>
+              <button
+                onClick={() => setShowFormulaModal(true)}
+                title="Configurar cálculo automático de status"
+                className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
+              >
+                ⚙️
+              </button>
             </div>
           </div>
         </div>
@@ -216,7 +230,7 @@ export default function CharacterEditPage() {
         <div className="card flex flex-col md:flex-row overflow-hidden bg-white/3 rounded-lg">
           <div className="w-full md:w-1/3 flex-shrink-0 bg-[#021018] flex items-center justify-center">
               <div className="w-full max-w-[420px] aspect-square">
-                <div onClick={()=>setShowImageEditor(s=>!s)} className="w-full h-full cursor-pointer">
+                <div onClick={()=>{ setImageEditorType('perfil'); setShowImageEditor(true); }} className="w-full h-full cursor-pointer">
                   {form && form.imagem_perfil ? (
                     <img src={form.imagem_perfil} alt={form.name || character.name} className="w-full h-full object-cover rounded-t-lg md:rounded-l-lg" />
                   ) : (
@@ -330,25 +344,37 @@ export default function CharacterEditPage() {
               </div>
 
               <div className="flex items-center justify-center">
-                <div className="w-full max-w-[220px] aspect-[2/3] border border-white/10 bg-[#021018]">
+                <div className="w-full max-w-[220px] aspect-[2/3] border border-white/10 bg-[#021018] cursor-pointer" onClick={()=>{ setImageEditorType('token'); setShowImageEditor(true); }}>
                   {form && form.imagem_token ? (
                     <img src={form.imagem_token} alt="token" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-xs text-gray-500">TOKEN</div>
                   )}
                 </div>
-                {showImageEditor && (
-                  <>
-                    <div className="mt-2">
-                      <label className="text-xs text-gray-400">URL Imagem Perfil</label>
-                      <input value={form ? form.imagem_perfil : ''} onChange={e=>setForm(f=>({...f, imagem_perfil: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-1" />
-                    </div>
-                    <div className="mt-2">
-                      <label className="text-xs text-gray-400">URL Token</label>
-                      <input value={form ? form.imagem_token : ''} onChange={e=>setForm(f=>({...f, imagem_token: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-1" />
-                    </div>
-                  </>
-                )}
+              
+              <ImageModal
+                open={showImageEditor}
+                title={imageEditorType === 'perfil' ? 'Editar imagem de perfil' : 'Editar token'}
+                initialUrl={imageEditorType === 'perfil' ? (form ? form.imagem_perfil : '') : (form ? form.imagem_token : '')}
+                onClose={() => setShowImageEditor(false)}
+                onSave={(url) => {
+                  if (imageEditorType === 'perfil') {
+                    setForm(f=>({...f, imagem_perfil: url}));
+                  } else if (imageEditorType === 'token') {
+                    setForm(f=>({...f, imagem_token: url}));
+                  }
+                  setShowImageEditor(false);
+                }}
+              />
+              <StatusFormulaModal
+                open={showFormulaModal}
+                initial={form ? (form.status_formula || null) : null}
+                onClose={() => setShowFormulaModal(false)}
+                onSave={(obj) => {
+                  setForm(f => ({ ...(f || {}), status_formula: obj }));
+                  setShowFormulaModal(false);
+                }}
+              />
               </div>
             </div>
           </div>
