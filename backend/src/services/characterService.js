@@ -367,9 +367,35 @@ const CharacterService = {
               }
             } catch (e) { bloqueioVal = 0; }
 
-            CharacterModel.updateMaxAndDefenses(characterId, vidaMax, esforcoMax, sanidadeMax, defesa_passiva, esquivaVal, bloqueioVal, (err3) => {
-              if (err3) return callback(err3);
-              return callback(null, { vida_max: vidaMax, esforco_max: esforcoMax, sanidade_max: sanidadeMax, defesa_passiva, esquiva: esquivaVal, bloqueio: bloqueioVal });
+            const InventoryModel = require('../models/inventoryModel');
+            // compute carga atual (sum spaces) and carga maxima using status_formula
+            InventoryModel.findByCharacterId(characterId, (errInv, items) => {
+              if (errInv) return callback(errInv);
+              const cargaAtual = (items || []).reduce((acc, it) => acc + (Number(it.space) || 0), 0);
+
+              let cargaMaxima = 0;
+              try {
+                const formula = parseFormula(character.status_formula);
+                const baseAttr = (formula && formula.base_attribute) ? formula.base_attribute : 'forca';
+                const extraAttr = (formula && formula.extra_attribute) ? formula.extra_attribute : null;
+                const attrMapLocal = { forca: Number(attr.forca||0), agilidade: Number(attr.agilidade||0), intelecto: Number(attr.intelecto||0), vigor: Number(attr.vigor||0), presenca: Number(attr.presenca||0) };
+                const baseVal = Number(attrMapLocal[baseAttr] || 0);
+                const extraVal = extraAttr ? Number(attrMapLocal[extraAttr] || 0) : 0;
+                const sum = baseVal + extraVal;
+                const sumModifiersLocal = (mods) => { if (!mods || !Array.isArray(mods)) return 0; return mods.reduce((s, m) => s + (Number(m && m.value) || 0), 0); };
+                const mods = sumModifiersLocal((formula && formula.modifiers) || []);
+                cargaMaxima = (sum > 0) ? ((sum * 5) + mods) : 0;
+              } catch (e) {
+                cargaMaxima = (Number(attr.forca) > 0) ? (Number(attr.forca) * 5) : 2;
+              }
+
+              CharacterModel.setCarga(characterId, cargaAtual, cargaMaxima, (errSet) => {
+                if (errSet) return callback(errSet);
+                CharacterModel.updateMaxAndDefenses(characterId, vidaMax, esforcoMax, sanidadeMax, defesa_passiva, esquivaVal, bloqueioVal, (err3) => {
+                  if (err3) return callback(err3);
+                  return callback(null, { vida_max: vidaMax, esforco_max: esforcoMax, sanidade_max: sanidadeMax, defesa_passiva, esquiva: esquivaVal, bloqueio: bloqueioVal, carga_atual: cargaAtual, carga_maxima: cargaMaxima });
+                });
+              });
             });
           });
         };

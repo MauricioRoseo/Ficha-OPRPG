@@ -29,7 +29,28 @@ const InventoryController = {
           AttributeModel.findByCharacterId(data.character_id, (err4, attrs) => {
             if (err4) return res.status(500).json(err4);
             const a = (attrs && attrs[0]) || { forca: 0 };
-            const cargaMax = (Number(a.forca) > 0) ? (Number(a.forca) * 5) : 2;
+            // compute cargaMax using optional status_formula from character
+            let cargaMax = 0;
+            try {
+              let formula = character.status_formula || null;
+              if (typeof formula === 'string' && formula.length) {
+                formula = JSON.parse(formula);
+              }
+
+              const baseAttr = (formula && formula.base_attribute) ? formula.base_attribute : 'forca';
+              const extraAttr = (formula && formula.extra_attribute) ? formula.extra_attribute : null;
+
+              const baseVal = Number(a[baseAttr] || 0);
+              const extraVal = extraAttr ? Number(a[extraAttr] || 0) : 0;
+              const sum = baseVal + extraVal;
+
+              const sumModifiers = (mods) => { if (!mods || !Array.isArray(mods)) return 0; return mods.reduce((s,m)=>s + (Number(m && m.value) || 0), 0); };
+              const mods = sumModifiers((formula && formula.modifiers) || []);
+
+              cargaMax = (sum > 0) ? ((sum * 5) + mods) : 0;
+            } catch (e) {
+              cargaMax = (Number(a.forca) > 0) ? (Number(a.forca) * 5) : 2;
+            }
             CharacterModel.setCarga(data.character_id, cargaAtual, cargaMax, (err5) => {
               if (err5) return res.status(500).json(err5);
               InventoryModel.findById(result.insertId, (err6, created) => {
@@ -63,7 +84,28 @@ const InventoryController = {
             AttributeModel.findByCharacterId(item.character_id, (err5, attrs) => {
               if (err5) return res.status(500).json(err5);
               const a = (attrs && attrs[0]) || { forca: 0 };
-              const cargaMax = (Number(a.forca) > 0) ? (Number(a.forca) * 5) : 2;
+              // compute cargaMax using optional status_formula from character
+              let cargaMax = 0;
+              try {
+                let formula = character.status_formula || null;
+                if (typeof formula === 'string' && formula.length) {
+                  formula = JSON.parse(formula);
+                }
+
+                const baseAttr = (formula && formula.base_attribute) ? formula.base_attribute : 'forca';
+                const extraAttr = (formula && formula.extra_attribute) ? formula.extra_attribute : null;
+
+                const baseVal = Number(a[baseAttr] || 0);
+                const extraVal = extraAttr ? Number(a[extraAttr] || 0) : 0;
+                const sum = baseVal + extraVal;
+
+                const sumModifiers = (mods) => { if (!mods || !Array.isArray(mods)) return 0; return mods.reduce((s,m)=>s + (Number(m && m.value) || 0), 0); };
+                const mods = sumModifiers((formula && formula.modifiers) || []);
+
+                cargaMax = (sum > 0) ? ((sum * 5) + mods) : 0;
+              } catch (e) {
+                cargaMax = (Number(a.forca) > 0) ? (Number(a.forca) * 5) : 2;
+              }
               CharacterModel.setCarga(item.character_id, cargaAtual, cargaMax, (err6) => {
                 if (err6) return res.status(500).json(err6);
                 InventoryModel.findById(id, (err7, updated) => {
@@ -96,7 +138,28 @@ const InventoryController = {
             AttributeModel.findByCharacterId(item.character_id, (err5, attrs) => {
               if (err5) return res.status(500).json(err5);
               const a = (attrs && attrs[0]) || { forca: 0 };
-              const cargaMax = (Number(a.forca) > 0) ? (Number(a.forca) * 5) : 2;
+              // compute cargaMax using optional status_formula from character
+              let cargaMax = 0;
+              try {
+                let formula = character.status_formula || null;
+                if (typeof formula === 'string' && formula.length) {
+                  formula = JSON.parse(formula);
+                }
+
+                const baseAttr = (formula && formula.base_attribute) ? formula.base_attribute : 'forca';
+                const extraAttr = (formula && formula.extra_attribute) ? formula.extra_attribute : null;
+
+                const baseVal = Number(a[baseAttr] || 0);
+                const extraVal = extraAttr ? Number(a[extraAttr] || 0) : 0;
+                const sum = baseVal + extraVal;
+
+                const sumModifiers = (mods) => { if (!mods || !Array.isArray(mods)) return 0; return mods.reduce((s,m)=>s + (Number(m && m.value) || 0), 0); };
+                const mods = sumModifiers((formula && formula.modifiers) || []);
+
+                cargaMax = (sum > 0) ? ((sum * 5) + mods) : 0;
+              } catch (e) {
+                cargaMax = (Number(a.forca) > 0) ? (Number(a.forca) * 5) : 2;
+              }
               CharacterModel.setCarga(item.character_id, cargaAtual, cargaMax, (err6) => {
                 if (err6) return res.status(500).json(err6);
                 res.json({ message: 'Item removido', carga_atual: cargaAtual, carga_maxima: cargaMax });

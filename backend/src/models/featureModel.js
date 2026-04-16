@@ -134,13 +134,16 @@ const FeatureModel = {
   ,
 
   updateCharacterFeature: (id, data, callback) => {
-    const sql = `UPDATE character_features SET value = ?, training_level = ?, extra = ?, notes = ?, encumbrance_penalty = ? WHERE id = ?`;
+    const sql = `UPDATE character_features SET value = ?, training_level = ?, extra = ?, notes = ?, encumbrance_penalty = ?, template_name = ?, template_description = ?, template_metadata = ? WHERE id = ?`;
     const values = [
       data.value || 0,
       data.training_level || 'none',
       data.extra || 0,
       data.notes || null,
       (data.has_encumbrance_penalty ? (data.encumbrance_penalty || 0) : null),
+      (data.template_name !== undefined ? data.template_name : null),
+      (data.template_description !== undefined ? data.template_description : null),
+      (data.template_metadata !== undefined && data.template_metadata !== null) ? JSON.stringify(data.template_metadata) : null,
       id
     ];
     db.query(sql, values, callback);

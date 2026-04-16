@@ -487,11 +487,11 @@ export default function CharacterEditPage() {
           <FichaPaper>
             <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
               <div className="md:col-span-3">
-                <InventoryPanel character={character} onCharacterUpdate={setCharacter} />
+                <InventoryPanel character={character} onCharacterUpdate={setCharacter} editable={true} />
               </div>
 
               <div className="md:col-span-3">
-                <SkillsPanel character={character} />
+                <SkillsPanel character={character} editable={true} />
               </div>
             </div>
           </FichaPaper>

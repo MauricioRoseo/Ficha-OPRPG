@@ -217,6 +217,30 @@ CREATE TABLE IF NOT EXISTS protection_templates (
     CONSTRAINT protection_templates_ibfk_1 FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+-- Ensure compatibility: for MySQL versions that don't support
+-- `ADD COLUMN IF NOT EXISTS`, use INFORMATION_SCHEMA and prepared statements.
+-- Run these statements while connected to the target database (USE Ficha_OPRPG;)
+
+-- add status_formula if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='characters' AND COLUMN_NAME='status_formula';
+SET @sql = IF(@c=0, 'ALTER TABLE characters ADD COLUMN status_formula JSON DEFAULT NULL', 'SELECT "status_formula already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- add carga_atual if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='characters' AND COLUMN_NAME='carga_atual';
+SET @sql = IF(@c=0, 'ALTER TABLE characters ADD COLUMN carga_atual INT DEFAULT 0', 'SELECT "carga_atual already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- add carga_maxima if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='characters' AND COLUMN_NAME='carga_maxima';
+SET @sql = IF(@c=0, 'ALTER TABLE characters ADD COLUMN carga_maxima INT DEFAULT 0', 'SELECT "carga_maxima already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- add defense_formula if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='characters' AND COLUMN_NAME='defense_formula';
+SET @sql = IF(@c=0, 'ALTER TABLE characters ADD COLUMN defense_formula JSON DEFAULT NULL', 'SELECT "defense_formula already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- link protections to templates (nullable)
 ALTER TABLE protections ADD COLUMN template_id INT DEFAULT NULL;
 ALTER TABLE protections ADD KEY template_id_idx (template_id);

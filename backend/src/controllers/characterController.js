@@ -228,9 +228,29 @@ CharacterController.updateDetails = (req, res) => {
     if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
     if (character.user_id !== userId) return res.status(403).json({ message: 'Acesso negado' });
 
+    // merge provided payload with existing character to avoid setting NOT NULL fields to null
+    const mergedPayload = {
+      name: payload.name !== undefined ? payload.name : character.name,
+      idade: payload.idade !== undefined ? payload.idade : character.idade,
+      origem: payload.origem !== undefined ? payload.origem : character.origem,
+      origem_id: payload.origem_id !== undefined ? payload.origem_id : character.origem_id,
+      classe: payload.classe !== undefined ? payload.classe : character.classe,
+      classe_id: payload.classe_id !== undefined ? payload.classe_id : character.classe_id,
+      trilha: payload.trilha !== undefined ? payload.trilha : character.trilha,
+      trilha_id: payload.trilha_id !== undefined ? payload.trilha_id : character.trilha_id,
+      nivel: payload.nivel !== undefined ? payload.nivel : character.nivel,
+      nex: payload.nex !== undefined ? payload.nex : character.nex,
+      prestigio: payload.prestigio !== undefined ? payload.prestigio : character.prestigio,
+      afinidade: payload.afinidade !== undefined ? payload.afinidade : character.afinidade,
+      imagem_perfil: payload.imagem_perfil !== undefined ? payload.imagem_perfil : character.imagem_perfil,
+      imagem_token: payload.imagem_token !== undefined ? payload.imagem_token : character.imagem_token,
+      status_formula: payload.status_formula !== undefined ? payload.status_formula : character.status_formula,
+      defense_formula: payload.defense_formula !== undefined ? payload.defense_formula : character.defense_formula
+    };
+
     // validate template ids if provided
     const validateAndUpdate = () => {
-      CharacterModel.updateDetails(id, payload, (err2, result) => {
+      CharacterModel.updateDetails(id, mergedPayload, (err2, result) => {
         if (err2) return res.status(500).json(err2);
         // after updating details, recalculate max stats based on new class/level/formula
         const CharacterService = require('../services/characterService');

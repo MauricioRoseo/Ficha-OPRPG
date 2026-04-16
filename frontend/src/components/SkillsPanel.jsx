@@ -2,9 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 
-export default function SkillsPanel({ character }) {
+export default function SkillsPanel({ character, editable = false }) {
   const [skills, setSkills] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [editingSkill, setEditingSkill] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingSkill, setViewingSkill] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [catalogResults, setCatalogResults] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
@@ -75,7 +79,22 @@ export default function SkillsPanel({ character }) {
         <div className="grid grid-cols-1 gap-2">
           {skills.map(s => (
             <div key={s.id} className="p-3 bg-[#011415] border border-white/6 rounded">
-              <div className="text-sm text-gray-300">({s.origin || s.template_name || s.metadata?.source || 'Origem desconhecida'} - {s.name}). {s.description || s.template_description || '-'}</div>
+              <div className="flex justify-between items-start">
+                <div onClick={() => { if (!editable) { setViewingSkill(s); setShowViewModal(true); } }} className="text-sm text-gray-300 cursor-pointer">({s.origin || s.template_name || s.metadata?.source || 'Origem desconhecida'} - {s.name}). {s.description || s.template_description || '-'}</div>
+                {editable ? (
+                  <div className="flex gap-2">
+                    <button onClick={() => { setEditingSkill(s); setShowEditModal(true); }} className="px-2 py-1 border border-white/10 rounded text-sm">Editar</button>
+                    <button onClick={async ()=>{
+                      if (!confirm('Remover habilidade do personagem?')) return;
+                      try {
+                        const res = await fetch(`http://localhost:3001/features/character/${character.id}/${s.id}`, { method: 'DELETE', headers: { Authorization: token ? `Bearer ${token}` : '' } });
+                        if (!res.ok) throw new Error('Erro ao remover habilidade');
+                        fetchSkills();
+                      } catch (e) { console.error(e); alert('Erro ao remover habilidade'); }
+                    }} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400">Remover</button>
+                  </div>
+                ) : null}
+              </div>
             </div>
           ))}
         </div>
@@ -129,6 +148,62 @@ export default function SkillsPanel({ character }) {
                   <button className="px-3 py-1 bg-white/6 rounded">Criar e adicionar</button>
                 </div>
               </form>
+            </div>
+          </div>
+        ) : null}
+        {showEditModal && editingSkill ? (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
+            <div className="bg-[#021018] p-4 rounded w-full max-w-md">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold">Editar Habilidade (nome, origem, descrição)</h4>
+                <button onClick={()=>{ setShowEditModal(false); setEditingSkill(null); }} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
+              </div>
+              <form onSubmit={async (e) => {
+                e.preventDefault();
+                const f = new FormData(e.target);
+                const payload = {
+                  template_name: f.get('name') || null,
+                  template_description: f.get('description') || null,
+                  template_metadata: { source: f.get('origin') || null }
+                };
+                try {
+                  const res = await fetch(`http://localhost:3001/features/character/${character.id}/${editingSkill.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+                  if (!res.ok) throw new Error('Erro ao atualizar habilidade');
+                  await fetchSkills();
+                  setShowEditModal(false);
+                  setEditingSkill(null);
+                } catch (err) { alert('Erro ao atualizar habilidade'); console.error(err); }
+              }} className="space-y-3">
+                <div>
+                  <label className="text-sm text-gray-400">Nome</label>
+                  <input name="name" defaultValue={editingSkill?.template_name || editingSkill?.name || ''} className="w-full mt-1 p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400">Origem / Fonte</label>
+                  <input name="origin" defaultValue={editingSkill?.origin || editingSkill?.template_metadata?.source || ''} className="w-full mt-1 p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                </div>
+                <div>
+                  <label className="text-sm text-gray-400">Descrição</label>
+                  <textarea name="description" defaultValue={editingSkill?.template_description || editingSkill?.description || ''} className="w-full mt-1 p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={()=>{ setShowEditModal(false); setEditingSkill(null); }} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
+                  <button className="px-3 py-1 bg-white/6 rounded">Salvar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {showViewModal && viewingSkill ? (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
+            <div className="bg-[#021018] p-4 rounded w-full max-w-md">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold">{viewingSkill.template_name || viewingSkill.name}</h4>
+                <button onClick={()=>{ setShowViewModal(false); setViewingSkill(null); }} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
+              </div>
+              <div className="mb-2 text-sm text-gray-400">Origem: {viewingSkill.origin || viewingSkill.template_metadata?.source || 'Origem desconhecida'}</div>
+              <div className="text-sm">{viewingSkill.template_description || viewingSkill.description || '-'}</div>
             </div>
           </div>
         ) : null}

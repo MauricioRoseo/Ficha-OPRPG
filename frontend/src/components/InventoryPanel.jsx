@@ -2,13 +2,19 @@
 
 import React, { useEffect, useState } from "react";
 
-export default function InventoryPanel({ character, onCharacterUpdate }) {
+export default function InventoryPanel({ character, onCharacterUpdate, editable = false }) {
   const [items, setItems] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [catalogResults, setCatalogResults] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState({ name: '', description: '', space: 0, category: '' });
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({ name: '', description: '', space: 0, category: '' });
+  const [editItemId, setEditItemId] = useState(null);
+  const [showConfigModal, setShowConfigModal] = useState(false);
+  const [config, setConfig] = useState({ base_attribute: 'forca', extra_attribute: '', modifiers: [] });
+  const [attributesList, setAttributesList] = useState([]);
   const [patrimonio, setPatrimonio] = useState(character.patrimonio || '');
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
@@ -22,6 +28,29 @@ export default function InventoryPanel({ character, onCharacterUpdate }) {
     } catch (e) { console.error(e); setItems([]); }
   };
 
+  const handleEditClick = (item) => {
+    setEditItemId(item.id);
+    setEditForm({ name: item.name || '', description: item.description || '', space: item.space || 0, category: item.category || '' });
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async (e) => {
+    e && e.preventDefault && e.preventDefault();
+    if (!editItemId) return;
+    try {
+      const payload = { ...editForm };
+      const res = await fetch(`http://localhost:3001/inventory/${editItemId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+      if (!res.ok) throw new Error('Erro ao atualizar item');
+      const json = await res.json();
+      await fetchItems();
+      setShowEditModal(false);
+      setEditItemId(null);
+      if (json && json.carga_atual !== undefined && onCharacterUpdate) {
+        onCharacterUpdate(prev => ({ ...prev, carga_atual: json.carga_atual, carga_maxima: json.carga_maxima }));
+      }
+    } catch (e) { console.error(e); alert('Erro ao atualizar item'); }
+  };
+
   const searchCatalog = async (q) => {
     if (!character?.id) return;
     try {
@@ -33,6 +62,71 @@ export default function InventoryPanel({ character, onCharacterUpdate }) {
   };
 
   useEffect(()=>{ fetchItems(); setPatrimonio(character.patrimonio || ''); }, [character?.id]);
+
+  useEffect(()=>{
+    // load existing status_formula from character if present
+    try {
+      let sf = character && character.status_formula ? character.status_formula : null;
+      if (typeof sf === 'string' && sf.length) sf = JSON.parse(sf);
+      if (sf) setConfig({ base_attribute: sf.base_attribute || 'forca', extra_attribute: sf.extra_attribute || '', modifiers: sf.modifiers || [] });
+    } catch (e) { /* ignore */ }
+  }, [character?.id]);
+
+  const fetchAttributesList = async () => {
+    if (!character?.id) return;
+    try {
+      const res = await fetch(`http://localhost:3001/attributes/${character.id}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+      if (!res.ok) throw new Error('Erro ao buscar atributos');
+      const data = await res.json();
+      // data is an object with attribute fields
+      setAttributesList(Object.keys(data || {}).filter(k=>['forca','agilidade','intelecto','vigor','presenca'].includes(k)).map(k=>({ key:k, label:k })));
+    } catch (e) { console.error(e); setAttributesList([]); }
+  };
+
+  const handleOpenConfig = async () => {
+    await fetchAttributesList();
+    setShowConfigModal(true);
+  };
+
+  const handleAddModifier = () => setConfig(c=>({ ...c, modifiers: [...(c.modifiers||[]), { id: Date.now(), label: 'Mod', value: 0 }] }));
+
+  const handleRemoveModifier = (id) => setConfig(c=>({ ...c, modifiers: (c.modifiers||[]).filter(m=>m.id!==id) }));
+
+  const handleSaveConfig = async () => {
+    try {
+      const payload = { status_formula: { base_attribute: config.base_attribute, extra_attribute: config.extra_attribute || null, modifiers: config.modifiers || [] } };
+      const headers = { 'Content-Type': 'application/json' };
+      if (token) headers.Authorization = `Bearer ${token}`;
+      const res = await fetch(`http://localhost:3001/characters/${character.id}/details`, { method: 'PUT', headers, body: JSON.stringify(payload) });
+      if (!res.ok) {
+        let bodyText = '';
+        try {
+          const txt = await res.text();
+          bodyText = txt;
+          try { const j = JSON.parse(txt); if (j && j.message) bodyText = JSON.stringify(j); } catch (e) {}
+        } catch (e) { bodyText = '<sem corpo>' }
+        const msg = `Erro ${res.status}: ${bodyText}`;
+        throw new Error(msg);
+      }
+      // refresh items and refetch full character to propagate carga/status updates
+      const json = await res.json();
+      setShowConfigModal(false);
+      await fetchItems();
+      try {
+        const headers2 = { 'Content-Type': 'application/json' };
+        if (token) headers2.Authorization = `Bearer ${token}`;
+        const r2 = await fetch(`http://localhost:3001/characters/${character.id}/full`, { headers: headers2 });
+        if (r2.ok) {
+          const data = await r2.json();
+          if (onCharacterUpdate) onCharacterUpdate(data.character || data);
+        } else {
+          if (onCharacterUpdate) onCharacterUpdate(prev=>({ ...prev }));
+        }
+      } catch (e) {
+        if (onCharacterUpdate) onCharacterUpdate(prev=>({ ...prev }));
+      }
+    } catch (e) { console.error('Erro ao salvar configuração', e); alert(e && e.message ? e.message : 'Erro ao salvar configuração'); }
+  };
 
   const handleCreate = async (e) => {
     e && e.preventDefault && e.preventDefault();
@@ -116,7 +210,10 @@ export default function InventoryPanel({ character, onCharacterUpdate }) {
         <div className="flex justify-between items-center mb-2">
           <div className="text-sm text-gray-400">Itens carregados</div>
           <div className="flex gap-2">
-            <button onClick={()=>{ setShowModal(true); setShowAdd(false); setCatalogResults([]); setSearchTerm(''); }} className="px-2 py-1 border border-white/10 rounded text-sm">Novo item</button>
+              <button onClick={()=>{ setShowModal(true); setShowAdd(false); setCatalogResults([]); setSearchTerm(''); }} className="px-2 py-1 border border-white/10 rounded text-sm">Novo item</button>
+              {editable ? (
+                <button onClick={handleOpenConfig} className="px-2 py-1 border border-white/10 rounded text-sm">Configurar carga</button>
+              ) : null}
           </div>
         </div>
 
@@ -207,12 +304,102 @@ export default function InventoryPanel({ character, onCharacterUpdate }) {
                   <td className="py-2">{i.description || '-'}</td>
                   <td className="py-2">{i.space}</td>
                   <td className="py-2">{i.category || '-'}</td>
-                  <td className="py-2"><button onClick={()=>handleDelete(i.id)} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400">Remover</button></td>
+                  <td className="py-2 flex gap-2">
+                    <button onClick={()=>handleEditClick(i)} className="px-2 py-1 border border-white/10 rounded text-sm">Editar</button>
+                    <button onClick={()=>handleDelete(i.id)} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400">Remover</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {showEditModal ? (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
+            <div className="bg-[#021018] p-4 rounded w-full max-w-2xl">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold">Editar item</h4>
+                <button onClick={()=>setShowEditModal(false)} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
+              </div>
+              <form onSubmit={handleUpdate} className="space-y-2 mt-3">
+                <input required placeholder="Nome" value={editForm.name} onChange={e=>setEditForm(f=>({...f, name: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                <textarea placeholder="Descrição" value={editForm.description} onChange={e=>setEditForm(f=>({...f, description: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                <div className="grid grid-cols-2 gap-2">
+                  <input type="number" placeholder="Espaço (peso)" value={editForm.space} onChange={e=>setEditForm(f=>({...f, space: Number(e.target.value)}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  <select value={editForm.category} onChange={e=>setEditForm(f=>({...f, category: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded">
+                    <option value="">Nenhuma</option>
+                    <option value="0">0</option>
+                    <option value="I">I</option>
+                    <option value="II">II</option>
+                    <option value="III">III</option>
+                    <option value="IV">IV</option>
+                  </select>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={()=>{ setShowEditModal(false); setEditItemId(null); }} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
+                  <button className="px-3 py-1 bg-white/6 rounded">Salvar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {showConfigModal ? (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
+            <div className="bg-[#021018] p-4 rounded w-full max-w-2xl">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold">Configurar cálculo de carga</h4>
+                <button onClick={()=>setShowConfigModal(false)} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
+              </div>
+
+              <div className="space-y-2">
+                <div>
+                  <div className="text-sm text-gray-400">Fórmula</div>
+                  <div className="p-2 bg-[#011415] rounded">Se o atributo base for menor ou igual a 0, capacidade = 0. Senão: (atributo base + atributo extra) * 5 + somatório dos modificadores fixos.</div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="text-xs text-gray-400">Atributo base</label>
+                  <select value={config.base_attribute} onChange={e=>setConfig(c=>({...c, base_attribute: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded">
+                    <option value="forca">forca</option>
+                    <option value="agilidade">agilidade</option>
+                    <option value="intelecto">intelecto</option>
+                    <option value="vigor">vigor</option>
+                    <option value="presenca">presenca</option>
+                  </select>
+
+                  <label className="text-xs text-gray-400">Atributo extra (opcional)</label>
+                  <select value={config.extra_attribute} onChange={e=>setConfig(c=>({...c, extra_attribute: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded">
+                    <option value="">Nenhum</option>
+                    {attributesList.map(a=> (<option key={a.key} value={a.key}>{a.key}</option>))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-gray-400">Modificadores fixos</div>
+                    <button onClick={handleAddModifier} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar</button>
+                  </div>
+                  <div className="space-y-2 mt-2 max-h-40 overflow-auto">
+                    {(config.modifiers || []).map(m=> (
+                      <div key={m.id} className="flex gap-2 items-center">
+                        <input value={m.label} onChange={e=>setConfig(c=>({ ...c, modifiers: c.modifiers.map(x=> x.id===m.id?({...x, label: e.target.value}):x) }))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                        <input type="number" value={m.value} onChange={e=>setConfig(c=>({ ...c, modifiers: c.modifiers.map(x=> x.id===m.id?({...x, value: Number(e.target.value)}):x) }))} className="p-2 bg-[#011415] text-white border border-white/6 rounded w-28" />
+                        <button onClick={()=>handleRemoveModifier(m.id)} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400">Remover</button>
+                      </div>
+                    ))}
+                    {(config.modifiers || []).length===0 ? <div className="text-sm text-gray-400">Nenhum modificador</div> : null}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <button onClick={()=>setShowConfigModal(false)} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
+                  <button onClick={handleSaveConfig} className="px-3 py-1 bg-white/6 rounded">Salvar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         <div className="mt-3">
           <label className="text-xs text-gray-400">Patrimônio</label>
