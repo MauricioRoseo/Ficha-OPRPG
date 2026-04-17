@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 
-export default function AttacksPanel({ character, attributes = {} }) {
+export default function AttacksPanel({ character, attributes = {}, editable = false }) {
   const [attacks, setAttacks] = useState([]);
   const [pericias, setPericias] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
@@ -10,6 +10,9 @@ export default function AttacksPanel({ character, attributes = {} }) {
   const [otherAttribute, setOtherAttribute] = useState('agilidade');
   const [otherModifier, setOtherModifier] = useState(0);
   const [form, setForm] = useState({ weapon: '', damage_type: '', range_type: 'Adjacente', base_pericia: '', damage: '', crit_margin: 20, crit_multiplier: 2, ammo: '' });
+  const [showEdit, setShowEdit] = useState(false);
+  const [editingAttack, setEditingAttack] = useState(null);
+  const [editForm, setEditForm] = useState({ weapon: '', damage_type: '', range_type: 'Adjacente', base_pericia: '', damage: '', crit_margin: 20, crit_multiplier: 2, ammo: '' });
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   const fetchAttacks = async () => {
@@ -61,12 +64,54 @@ export default function AttacksPanel({ character, attributes = {} }) {
     try {
       const payload = { ...form, base_pericia: baseStr };
       const res = await fetch(`http://localhost:3001/characters/${character.id}/attacks`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
-      if (!res.ok) throw new Error('Erro ao criar ataque');
+      if (!res.ok) {
+        // try to extract error message from response
+        let errMsg = `Erro ao criar ataque (status ${res.status})`;
+        try {
+          const j = await res.json();
+          if (j && j.message) errMsg = j.message;
+        } catch (parseErr) {
+          // ignore parse error
+        }
+        throw new Error(errMsg);
+      }
       setShowAdd(false);
       setSelectedPericia(''); setOtherAttribute('agilidade'); setOtherModifier(0);
       setForm({ weapon: '', damage_type: '', range_type: 'Adjacente', base_pericia: '', damage: '', crit_margin: 20, crit_multiplier: 2, ammo: '' });
       await fetchAttacks();
-    } catch (e) { alert('Erro'); console.error(e); }
+    } catch (e) { alert(e.message || 'Erro ao criar ataque'); console.error(e); }
+  };
+
+  const openEdit = (a) => {
+    setEditingAttack(a);
+    setEditForm({
+      weapon: a.weapon || a.name || '',
+      damage_type: a.damage_type || '',
+      range_type: a.range_type || 'Adjacente',
+      base_pericia: a.base_pericia || '',
+      damage: a.damage || '',
+      crit_margin: a.crit_margin || 20,
+      crit_multiplier: a.crit_multiplier || 2,
+      ammo: a.ammo || ''
+    });
+    setShowEdit(true);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    if (!editingAttack) return;
+    try {
+      const payload = { ...editForm };
+      const res = await fetch(`http://localhost:3001/attacks/${editingAttack.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+      if (!res.ok) {
+        let errMsg = `Erro ao atualizar ataque (status ${res.status})`;
+        try { const j = await res.json(); if (j && j.message) errMsg = j.message; } catch(_){}
+        throw new Error(errMsg);
+      }
+      setShowEdit(false);
+      setEditingAttack(null);
+      await fetchAttacks();
+    } catch (err) { alert(err.message || 'Erro ao atualizar ataque'); console.error(err); }
   };
 
   const handleDelete = async (id) => {
@@ -193,12 +238,77 @@ export default function AttacksPanel({ character, attributes = {} }) {
                   <td className="py-2">{a.base_pericia || '-'}</td>
                   <td className="py-2">{a.damage || '-'}</td>
                   <td className="py-2">{a.crit_margin ? `${a.crit_margin}x${a.crit_multiplier||1}` : '-'}</td>
-                  <td className="py-2"><button onClick={()=>handleDelete(a.id)} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400 hover:text-red-500" title="Remover ataque"><svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg></button></td>
+                  <td className="py-2 text-right">
+                    {editable ? (
+                      <>
+                        <button onClick={() => openEdit(a)} className="mr-2 px-2 py-1 border border-white/10 rounded text-sm text-gray-300 hover:text-white" title="Editar ataque">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>
+                        </button>
+                        <button onClick={()=>handleDelete(a.id)} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400 hover:text-red-500" title="Remover ataque">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
+                        </button>
+                      </>
+                    ) : (
+                      <div className="text-gray-400">&nbsp;</div>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {showEdit ? (
+          <div className="modal-overlay fixed inset-0 z-50 flex items-center justify-center">
+            <div className="modal-card bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md">
+              <h3 className="text-lg font-bold mb-3">Editar Ataque</h3>
+              <form onSubmit={handleEditSubmit} className="space-y-3">
+                <input required placeholder="Arma" value={editForm.weapon} onChange={e=>setEditForm(f=>({...f, weapon: e.target.value}))} className="w-full p-2 bg-[#021018] text-white border border-white/6 rounded" />
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={editForm.damage_type} onChange={e=>setEditForm(f=>({...f, damage_type: e.target.value}))} className="p-2 bg-[#021018] text-white border border-white/6 rounded">
+                    <option value="">Tipo de Dano</option>
+                    <option value="acid">Acid</option>
+                    <option value="balistico">Balístico</option>
+                    <option value="corte">Corte</option>
+                    <option value="eletricidade">Eletricidade</option>
+                    <option value="fogo">Fogo</option>
+                    <option value="frio">Frio</option>
+                    <option value="impacto">Impacto</option>
+                    <option value="mental">Mental</option>
+                    <option value="perfuracao">Perfuracao</option>
+                    <option value="veneno">Veneno</option>
+                    <option value="conhecimento">Conhecimento</option>
+                    <option value="energia">Energia</option>
+                    <option value="sangue">Sangue</option>
+                    <option value="morte">Morte</option>
+                  </select>
+                  <select value={editForm.range_type} onChange={e=>setEditForm(f=>({...f, range_type: e.target.value}))} className="p-2 bg-[#021018] text-white border border-white/6 rounded">
+                    <option value="Adjacente">Adjacente</option>
+                    <option value="Curto">Curto</option>
+                    <option value="Médio">Médio</option>
+                    <option value="Longo">Longo</option>
+                    <option value="Extremo">Extremo</option>
+                    <option value="Ilimitado">Ilimitado</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs text-gray-400">Base perícia</label>
+                  <input placeholder="Base perícia" value={editForm.base_pericia} onChange={e=>setEditForm(f=>({...f, base_pericia: e.target.value}))} className="w-full p-2 bg-[#021018] text-white border border-white/6 rounded mb-2" />
+                </div>
+                <input placeholder="Dano (ex: 1d8+2)" value={editForm.damage} onChange={e=>setEditForm(f=>({...f, damage: e.target.value}))} className="w-full p-2 bg-[#021018] text-white border border-white/6 rounded" />
+                <div className="grid grid-cols-3 gap-2">
+                  <input type="number" placeholder="Margem crítico" value={editForm.crit_margin} onChange={e=>setEditForm(f=>({...f, crit_margin: Number(e.target.value)}))} className="p-2 bg-[#021018] text-white border border-white/6 rounded" />
+                  <input type="number" placeholder="Multiplicador crítico" value={editForm.crit_multiplier} onChange={e=>setEditForm(f=>({...f, crit_multiplier: Number(e.target.value)}))} className="p-2 bg-[#021018] text-white border border-white/6 rounded" />
+                  <input placeholder="Munição" value={editForm.ammo} onChange={e=>setEditForm(f=>({...f, ammo: e.target.value}))} className="p-2 bg-[#021018] text-white border border-white/6 rounded" />
+                </div>
+                <div className="flex gap-2 justify-end">
+                  <button type="button" onClick={()=>{ setShowEdit(false); setEditingAttack(null); }} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
+                  <button className="px-3 py-1 bg-white/6 rounded">Salvar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
 
       </div>
     </div>

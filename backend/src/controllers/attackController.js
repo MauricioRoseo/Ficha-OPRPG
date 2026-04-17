@@ -12,8 +12,16 @@ const AttackController = {
   createForCharacter: (req, res) => {
     const { characterId } = req.params;
     const data = req.body;
+    // basic validation
+    if (!data || !data.weapon) return res.status(400).json({ message: 'Campo "weapon" é obrigatório' });
+
     AttackModel.create(characterId, data, (err, result) => {
-      if (err) return res.status(500).json(err);
+      if (err) {
+        console.error('Erro ao criar ataque:', err);
+        // send a clear message string so frontend can display it
+        const message = (err && err.message) ? err.message : 'Erro ao criar ataque';
+        return res.status(500).json({ message, error: err });
+      }
       res.status(201).json({ id: result.insertId });
     });
   },

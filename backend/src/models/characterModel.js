@@ -83,39 +83,66 @@ const CharacterModel = {
 };
 
 // atualiza campos de status (vida, esforço, sanidade)
+// NOTE: only include `patrimonio` in the UPDATE when it's explicitly provided in `data`.
+// This avoids overwriting an existing patrimonio with NULL when callers don't send that field.
 CharacterModel.update = (id, data, callback) => {
-  const sql = `
-    UPDATE characters SET
-      vida_atual = ?,
-      vida_temp = ?,
-      esforco_atual = ?,
-      esforco_temp = ?,
-      sanidade_atual = ?,
-      defesa_passiva = ?,
-      esquiva = ?,
-      bloqueio = ?,
-      morrendo = ?,
-      enlouquecendo = ?,
-      patrimonio = ?
-    WHERE id = ?
-  `;
-
-  const values = [
-    data.vida_atual || 0,
-    data.vida_temp || 0,
-    data.esforco_atual || 0,
-    data.esforco_temp || 0,
-    data.sanidade_atual || 0,
-    data.defesa_passiva || 0,
-    data.esquiva || 0,
-    data.bloqueio || 0,
-    data.morrendo || 0,
-    data.enlouquecendo || 0,
-    (data.patrimonio !== undefined ? data.patrimonio : null),
-    id,
+  // base columns always updated
+  const baseSet = [
+    'vida_atual = ?',
+    'vida_temp = ?',
+    'esforco_atual = ?',
+    'esforco_temp = ?',
+    'sanidade_atual = ?',
+    'defesa_passiva = ?',
+    'esquiva = ?',
+    'bloqueio = ?',
+    'morrendo = ?',
+    'enlouquecendo = ?'
   ];
 
-  db.query(sql, values, callback);
+  const values = [
+    (data.vida_atual !== undefined ? data.vida_atual : 0),
+    (data.vida_temp !== undefined ? data.vida_temp : 0),
+    (data.esforco_atual !== undefined ? data.esforco_atual : 0),
+    (data.esforco_temp !== undefined ? data.esforco_temp : 0),
+    (data.sanidade_atual !== undefined ? data.sanidade_atual : 0),
+    (data.defesa_passiva !== undefined ? data.defesa_passiva : 0),
+    (data.esquiva !== undefined ? data.esquiva : 0),
+    (data.bloqueio !== undefined ? data.bloqueio : 0),
+    (data.morrendo !== undefined ? data.morrendo : 0),
+    (data.enlouquecendo !== undefined ? data.enlouquecendo : 0)
+  ];
+
+  let sql = `UPDATE characters SET ${baseSet.join(', ')} `;
+
+  // Only include patrimonio when provided (could be null intentionally)
+  if (Object.prototype.hasOwnProperty.call(data, 'patrimonio')) {
+    sql += `, patrimonio = ? `;
+    values.push(data.patrimonio);
+  }
+
+  sql += `WHERE id = ?`;
+  values.push(id);
+
+  db.query(sql, values, (err, result) => {
+    if (err) {
+      console.error('[DEBUG] CharacterModel.update SQL error', err, { sql: sql.trim(), values });
+    } else {
+      // find index of patrimonio value in values if present
+      let patrimonioVal = '<unchanged>';
+      if (Object.prototype.hasOwnProperty.call(data, 'patrimonio')) {
+        patrimonioVal = data.patrimonio;
+      }
+      try { console.log('[DEBUG] CharacterModel.update success', { id, patrimonio: patrimonioVal }); } catch(e){}
+    }
+    callback(err, result);
+  });
+};
+// add debug wrapper to update to log SQL and values
+const originalUpdate = CharacterModel.update;
+CharacterModel.update = (id, data, callback) => {
+  // This branch shouldn't be used because we defined update earlier as function, keep for safety
+  return originalUpdate(id, data, callback);
 };
 
 // update max stats and defenses for a character

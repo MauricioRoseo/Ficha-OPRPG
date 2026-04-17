@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import PericiaTemplatesModal from "./PericiaTemplatesModal";
 
-export default function RituaisPanel({ character, attributes }) {
+export default function RituaisPanel({ character, attributes, editable = false }) {
   const [rituais, setRituais] = useState([]);
   const [showModal, setShowModal] = useState(false);
   const [showCreate, setShowCreate] = useState(false);
@@ -11,10 +11,81 @@ export default function RituaisPanel({ character, attributes }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selected, setSelected] = useState(null);
   const [showDetail, setShowDetail] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editForm, setEditForm] = useState(null);
+  const [showModifiers, setShowModifiers] = useState(false);
+  const [modifiers, setModifiers] = useState([]);
   const initialNew = { name: '', element: '', description: '', circle: 1, execution: '', alcance: '', duration: '', resistencia_pericia_id: null, resistencia_pericia_name: '', aprimoramento_discente: false, custo_aprimoramento_discente: '', descricao_aprimoramento_discente: '', aprimoramento_verdadeiro: false, custo_aprimoramento_verdadeiro: '', descricao_aprimoramento_verdadeiro: '', symbol_image: '', symbol_image_secondary: '' };
   const [newRitual, setNewRitual] = useState(initialNew);
   const [periciaModalOpen, setPericiaModalOpen] = useState(false);
+  const [selectedCircle, setSelectedCircle] = useState(getMaxCircleAccess());
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+
+  // initialize selectedCircle and modifiers from server (character.status_formula) or fallback to localStorage
+  useEffect(()=>{
+    if (!character?.id) return;
+    try {
+      const sf = character.status_formula ? (typeof character.status_formula === 'string' ? JSON.parse(character.status_formula) : character.status_formula) : null;
+      if (sf && sf.rituals && sf.rituals.selected_circle) {
+        setSelectedCircle(Number(sf.rituals.selected_circle));
+      } else {
+        const key = `ritual_selected_circle_${character.id}`;
+        const v = localStorage.getItem(key);
+        if (v) setSelectedCircle(Number(v));
+      }
+
+      if (sf && sf.rituals && Array.isArray(sf.rituals.dt_modifiers)) {
+        setModifiers(sf.rituals.dt_modifiers || []);
+      } else {
+        const key2 = `ritual_dt_modifiers_${character.id}`;
+        const raw = localStorage.getItem(key2);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) setModifiers(parsed);
+        }
+      }
+    } catch(e) { /* ignore */ }
+  }, [character?.id]);
+
+  // persist selectedCircle to localStorage whenever it changes (immediate local persistence)
+  useEffect(()=>{
+    if (!character?.id) return;
+    try { localStorage.setItem(`ritual_selected_circle_${character.id}`, String(selectedCircle)); } catch(e){}
+  }, [selectedCircle, character?.id]);
+
+  // autosave selectedCircle and modifiers to server (debounced)
+  useEffect(()=>{
+    if (!character?.id) return;
+    const handler = setTimeout(async ()=>{
+      try {
+        const sf = character.status_formula ? (typeof character.status_formula === 'string' ? JSON.parse(character.status_formula) : character.status_formula) : {};
+        const newSf = { ...(sf || {}), rituals: { ...(sf && sf.rituals ? sf.rituals : {}), selected_circle: selectedCircle, dt_modifiers: modifiers } };
+        // persist locally as well
+        try { localStorage.setItem(`ritual_dt_modifiers_${character.id}`, JSON.stringify(modifiers || [])); } catch(e){}
+
+        const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+        const res = await fetch(`http://localhost:3001/characters/${character.id}/details`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify({ status_formula: newSf }) });
+        if (!res.ok) {
+          console.error('Falha ao salvar configurações de rituais no servidor');
+        } else {
+          // notify other parts of the app that character status_formula changed
+          try { window.dispatchEvent(new CustomEvent('character:status_formula_updated', { detail: { characterId: character.id, status_formula: newSf } })); } catch(e){}
+        }
+      } catch (err) { console.error('Erro autosaving ritual settings', err); }
+    }, 600);
+    return ()=>clearTimeout(handler);
+  }, [selectedCircle, modifiers, character?.id]);
+
+  const computeBaseDt = () => {
+    return 10 + (Number(character?.nivel) || 0) + (Number(attributes?.presenca) || 0);
+  };
+
+  const computeDisplayedDt = () => {
+    // DT shown is always base (10 + level + presenca) plus panel-level modifiers
+    const base = computeBaseDt();
+    const totalMods = (modifiers || []).reduce((s,m)=>s + (Number(m.value)||0), 0);
+    return base + totalMods;
+  };
 
   const fetchRituais = async () => {
     if (!character?.id) return;
@@ -23,6 +94,14 @@ export default function RituaisPanel({ character, attributes }) {
       if (!res.ok) throw new Error('Erro fetching rituais');
       const data = await res.json();
       setRituais(data || []);
+      // if we have a selected ritual, refresh it from new data so DT and modifiers display update
+      if (selected && selected.id) {
+          const found = (data || []).find(x => x.id === selected.id);
+          if (found) {
+            setSelected(found);
+            // Do not override panel-level modifiers from ritual data. Modifiers are global to DT.
+          }
+        }
     } catch (e) { console.error(e); setRituais([]); }
   };
 
@@ -41,7 +120,7 @@ export default function RituaisPanel({ character, attributes }) {
     return (character && character.limite_gasto_pe) || attributes?.limite_gasto_pe || attributes?.intelecto || 0;
   };
 
-  const getMaxCircleAccess = () => {
+  function getMaxCircleAccess() {
     const lvl = character?.nivel || 1;
     const cls = (character?.classe || '').toLowerCase();
     // Ocultista progression
@@ -64,14 +143,15 @@ export default function RituaisPanel({ character, attributes }) {
     if (lvl >= 11) return 3;
     if (lvl >= 5) return 2;
     return 1;
-  };
+  }
 
   const handleAddFromCatalog = async (ritual) => {
     try {
       const limiteGasto = getCharacterLimiteGasto();
+      const totalMods = (modifiers || []).reduce((s,m)=>s + (Number(m.value)||0), 0);
       const payload = {
-        dt_resistencia: 10 + limiteGasto + (attributes?.presenca || 0),
-        circulo: ritual.circle || ritual.circulo || 1,
+        dt_resistencia: computeBaseDt() + totalMods,
+        circulo: selectedCircle || ritual.circle || ritual.circulo || 1,
         limite_rituais: attributes?.intelecto || 1
       };
       const res = await fetch(`http://localhost:3001/rituals/character/${character.id}/${ritual.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
@@ -85,11 +165,12 @@ export default function RituaisPanel({ character, attributes }) {
     e.preventDefault();
     try {
       const limiteGasto = getCharacterLimiteGasto();
+      const totalMods = (modifiers || []).reduce((s,m)=>s + (Number(m.value)||0), 0);
       const payload = {
         name: newRitual.name,
         element: newRitual.element,
         description: newRitual.description,
-        circulo: newRitual.circle || 1,
+  circulo: selectedCircle || newRitual.circle || 1,
         execution: newRitual.execution || null,
         alcance: newRitual.alcance || null,
         duration: newRitual.duration || null,
@@ -103,7 +184,7 @@ export default function RituaisPanel({ character, attributes }) {
         descricao_aprimoramento_verdadeiro: newRitual.descricao_aprimoramento_verdadeiro || null,
         symbol_image: newRitual.symbol_image || null,
         symbol_image_secondary: newRitual.symbol_image_secondary || null,
-        dt_resistencia: 10 + limiteGasto + (attributes?.presenca || 0),
+        dt_resistencia: computeBaseDt() + totalMods,
         limite_rituais: attributes?.intelecto || 1,
       };
       const res = await fetch(`http://localhost:3001/rituals/character/${character.id}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
@@ -128,33 +209,45 @@ export default function RituaisPanel({ character, attributes }) {
       <div className="mb-3 stat-label">Rituais Conhecidos</div>
       <div className="panel p-3">
         <div className="flex justify-between items-center mb-3">
-          <div className="text-sm text-gray-400">Rituais conhecidos e limites</div>
-          <div className="flex gap-2">
-            <button onClick={()=>{ setShowModal(true); setCatalogResults([]); setSearchTerm(''); }} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar Ritual</button>
+            <div className="text-sm text-gray-400">Rituais conhecidos e limites</div>
+            <div className="flex gap-2">
+              <button onClick={()=>{ setShowModal(true); setCatalogResults([]); setSearchTerm(''); }} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar Ritual</button>
+              {editable ? (
+                <button onClick={()=>{ setShowModifiers(true); }} className="px-2 py-1 border border-white/10 rounded text-sm">Config</button>
+              ) : null}
+            </div>
           </div>
-        </div>
 
-        
           <div className="mb-3 flex items-center gap-4">
             <div className="text-sm text-gray-400">DT de resistência:</div>
-            <div className="font-mono">{10 + ((character && character.limite_gasto_pe) || attributes?.limite_gasto_pe || attributes?.intelecto || 0) + (attributes?.presenca || 0)}</div>
+            <div className="font-mono">{computeDisplayedDt()}</div>
             <div className="text-sm text-gray-400 ml-4">Limite de rituais (Intelecto):</div>
             <div className="font-mono">{attributes?.intelecto || 1}</div>
             <div className="text-sm text-gray-400 ml-4">Nível acesso:</div>
-            <div className="font-mono">Círculo {getMaxCircleAccess()}</div>
+            <div>
+              {editable ? (
+                <select value={selectedCircle} onChange={e=>setSelectedCircle(Number(e.target.value))} className="p-1 bg-[#011415] border border-white/6 rounded">
+                  {[1,2,3,4].map(c => (<option key={c} value={c}>{`${c}° Círculo`}</option>))}
+                </select>
+              ) : (
+                <div className="font-mono">Círculo {selectedCircle || getMaxCircleAccess()}</div>
+              )}
+            </div>
           </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {rituais.map(r => (
-            <div key={r.id} className="p-3 bg-[#011415] border border-white/6 rounded cursor-pointer flex gap-3" onClick={() => { setSelected(r); setShowDetail(true); }}>
+            <div key={r.id} className="p-3 bg-[#011415] border border-white/6 rounded cursor-pointer flex gap-3" onClick={() => { setSelected(r); if (editable) { setEditMode(true); setEditForm({ name: r.snapshot_name, element: r.snapshot_element, description: r.snapshot_description, execution: r.snapshot_execution, alcance: r.snapshot_alcance, duration: r.snapshot_duration, circulo: r.circulo, dt_resistencia: r.dt_resistencia || r.snapshot_dt_resistencia || 0, symbol_image: r.snapshot_symbol || r.symbol || '', symbol_image_secondary: r.snapshot_symbol_secondary || '' }); } else { setShowDetail(true); } }}>
               <div className="w-12 h-12 bg-[#021018] flex items-center justify-center rounded">
                 {r.snapshot_symbol ? <img src={r.snapshot_symbol} alt={r.snapshot_name} className="w-full h-full object-contain" /> : <div className="text-xs text-gray-400">SÍM</div>}
               </div>
               <div>
-                  <div className="font-semibold">{r.snapshot_name || r.snapshot_name}</div>
-                <div className="text-xs text-gray-400">{r.snapshot_element || r.snapshot_element} • Círculo {r.circulo || '-'}</div>
+            <div className="font-semibold">{r.snapshot_name || r.snapshot_name}</div>
+                <div className="text-xs text-gray-400">
+                  {r.snapshot_element || r.snapshot_element} • Círculo <span className="ml-1">{r.circulo || '-'}</span>
+                </div>
               </div>
-              <div className="ml-auto">
+              <div className="ml-auto flex items-center gap-2">
                 <button onClick={(e)=>{ e.stopPropagation(); handleRemove(r.id); }} className="px-2 py-1 border border-white/10 rounded text-sm">Remover</button>
               </div>
             </div>
@@ -291,7 +384,34 @@ export default function RituaisPanel({ character, attributes }) {
                     <div className="text-sm text-gray-400">{(selected.snapshot_element || '-') + ' • Círculo ' + (selected.circulo || '-')}</div>
                   </div>
                 </div>
-                <div>
+                <div className="flex gap-2">
+                    {editable ? (
+                      <>
+                        <button onClick={() => {
+                          // open edit form prefilled
+                          setEditMode(true);
+                          setEditForm({
+                            name: selected.snapshot_name,
+                            element: selected.snapshot_element,
+                            description: selected.snapshot_description,
+                            execution: selected.snapshot_execution,
+                            alcance: selected.snapshot_alcance,
+                            duration: selected.snapshot_duration,
+                            // circulo and dt_resistencia are NOT edited here per requirements
+                            symbol_image: selected.snapshot_symbol || selected.symbol || selected.snapshot_symbol,
+                            symbol_image_secondary: selected.snapshot_symbol_secondary || '' ,
+                            resistencia_pericia_id: selected.snapshot_resistencia_pericia_id || null,
+                            resistencia_pericia_name: selected.snapshot_resistencia_pericia_name || null,
+                            aprimoramento_discente: selected.snapshot_aprimoramento_discente || 0,
+                            custo_aprimoramento_discente: selected.snapshot_custo_aprimoramento_discente || null,
+                            descricao_aprimoramento_discente: selected.snapshot_descricao_aprimoramento_discente || null,
+                            aprimoramento_verdadeiro: selected.snapshot_aprimoramento_verdadeiro || 0,
+                            custo_aprimoramento_verdadeiro: selected.snapshot_custo_aprimoramento_verdadeiro || null,
+                            descricao_aprimoramento_verdadeiro: selected.snapshot_descricao_aprimoramento_verdadeiro || null
+                          });
+                        }} className="px-2 py-1 border border-white/10 rounded">Editar</button>
+                      </>
+                    ) : null}
                   <button onClick={()=>setShowDetail(false)} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
                 </div>
               </div>
@@ -336,6 +456,130 @@ export default function RituaisPanel({ character, attributes }) {
                     <div className="text-sm">{selected.snapshot_custo_aprimoramento_verdadeiro ? `+${selected.snapshot_custo_aprimoramento_verdadeiro} PE` : '-'}: {selected.snapshot_descricao_aprimoramento_verdadeiro || '-'}</div>
                   </div>
                 ) : null }
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Edit modal inside detail */}
+        {editMode && editForm ? (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-60">
+            <div className="bg-[#021018] p-4 rounded w-full max-w-2xl">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold">Editar Ritual</h4>
+                <div className="flex gap-2">
+                  <button onClick={()=>{ setEditMode(false); setEditForm(null); }} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
+                </div>
+              </div>
+              <form onSubmit={async (e)=>{ e.preventDefault();
+                try {
+                  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+                  const payload = {
+                    snapshot_name: editForm.name,
+                    snapshot_element: editForm.element,
+                    snapshot_description: editForm.description,
+                    snapshot_execution: editForm.execution,
+                    snapshot_alcance: editForm.alcance,
+                    snapshot_duration: editForm.duration,
+                    snapshot_resistencia_pericia_id: editForm.resistencia_pericia_id || null,
+                    snapshot_resistencia_pericia_name: editForm.resistencia_pericia_name || null,
+                    snapshot_aprimoramento_discente: editForm.aprimoramento_discente ? 1 : 0,
+                    snapshot_custo_aprimoramento_discente: editForm.custo_aprimoramento_discente || null,
+                    snapshot_descricao_aprimoramento_discente: editForm.descricao_aprimoramento_discente || null,
+                    snapshot_aprimoramento_verdadeiro: editForm.aprimoramento_verdadeiro ? 1 : 0,
+                    snapshot_custo_aprimoramento_verdadeiro: editForm.custo_aprimoramento_verdadeiro || null,
+                    snapshot_descricao_aprimoramento_verdadeiro: editForm.descricao_aprimoramento_verdadeiro || null,
+                    snapshot_symbol: editForm.symbol_image || null,
+                    snapshot_symbol_secondary: editForm.symbol_image_secondary || null
+                  };
+                  const res = await fetch(`http://localhost:3001/rituals/character/${character.id}/${selected.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
+                  if (!res.ok) throw new Error('Erro ao salvar');
+                  setEditMode(false); setEditForm(null); setShowDetail(false); fetchRituais();
+                } catch (err) { console.error(err); alert('Erro ao salvar ritual'); }
+              }} className="space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <input placeholder="Nome" value={editForm.name} onChange={e=>setEditForm(f=>({...f, name: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  <select value={editForm.element || ''} onChange={e=>setEditForm(f=>({...f, element: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded">
+                    <option value="">Elemento (selecionar)</option>
+                    <option value="Sangue">Sangue</option>
+                    <option value="Morte">Morte</option>
+                    <option value="Conhecimento">Conhecimento</option>
+                    <option value="Energia">Energia</option>
+                    <option value="Medo">Medo</option>
+                  </select>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input placeholder="Execução" value={editForm.execution || ''} onChange={e=>setEditForm(f=>({...f, execution: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  <input placeholder="Alvo / Área" value={editForm.alcance || ''} onChange={e=>setEditForm(f=>({...f, alcance: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                </div>
+                <div>
+                  <textarea placeholder="Descrição" value={editForm.description || ''} onChange={e=>setEditForm(f=>({...f, description: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input placeholder="Imagem símbolo principal (URL)" value={editForm.symbol_image || ''} onChange={e=>setEditForm(f=>({...f, symbol_image: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  <input placeholder="Imagem símbolo secundário (URL)" value={editForm.symbol_image_secondary || ''} onChange={e=>setEditForm(f=>({...f, symbol_image_secondary: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-400">Aprimoramento Discente - custo</label>
+                    <input placeholder="Custo (PE)" value={editForm.custo_aprimoramento_discente || ''} onChange={e=>setEditForm(f=>({...f, custo_aprimoramento_discente: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400">Aprimoramento Discente - descrição</label>
+                    <input placeholder="Descrição" value={editForm.descricao_aprimoramento_discente || ''} onChange={e=>setEditForm(f=>({...f, descricao_aprimoramento_discente: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="text-xs text-gray-400">Aprimoramento Verdadeiro - custo</label>
+                    <input placeholder="Custo (PE)" value={editForm.custo_aprimoramento_verdadeiro || ''} onChange={e=>setEditForm(f=>({...f, custo_aprimoramento_verdadeiro: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400">Aprimoramento Verdadeiro - descrição</label>
+                    <input placeholder="Descrição" value={editForm.descricao_aprimoramento_verdadeiro || ''} onChange={e=>setEditForm(f=>({...f, descricao_aprimoramento_verdadeiro: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button type="button" onClick={()=>{ setEditMode(false); setEditForm(null); }} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
+                  <button className="px-3 py-1 bg-white/6 rounded">Salvar</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
+
+        {/* Modifiers modal */}
+        {showModifiers ? (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-60">
+            <div className="bg-[#021018] p-4 rounded w-full max-w-md">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold">Configurar modificadores DT</h4>
+                <button onClick={()=>setShowModifiers(false)} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-auto mb-3">
+                {modifiers.map((m, idx) => (
+                  <div key={idx} className="flex gap-2 items-center">
+                    <input placeholder="Etiqueta" value={m.label} onChange={e=>setModifiers(prev => { const copy = [...prev]; copy[idx] = {...copy[idx], label: e.target.value}; return copy; })} className="flex-1 p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                    <input type="number" value={m.value} onChange={e=>setModifiers(prev => { const copy = [...prev]; copy[idx] = {...copy[idx], value: Number(e.target.value)}; return copy; })} className="w-20 p-2 bg-[#011415] text-white border border-white/6 rounded text-center" />
+                    <button onClick={()=>setModifiers(prev=>prev.filter((_,i)=>i!==idx))} className="px-2 py-1 border border-white/10 rounded">Rem</button>
+                  </div>
+                ))}
+                {modifiers.length === 0 && <div className="text-sm text-gray-400">Nenhum modificador</div>}
+              </div>
+              <div className="flex gap-2 mb-3">
+                <button onClick={()=>setModifiers(prev=>[...prev, { label: '', value: 0 }])} className="px-2 py-1 border border-white/10 rounded">Adicionar modificador</button>
+                <div className="ml-auto font-mono">Total: { (modifiers.reduce((s,m)=>s + (Number(m.value)||0), 0)) }</div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button onClick={async ()=>{
+                  // save modifiers to localStorage as panel-level DT modifiers and update displayed DT
+                  try {
+                    const key = `ritual_dt_modifiers_${character.id}`;
+                    localStorage.setItem(key, JSON.stringify(modifiers || []));
+                    setShowModifiers(false);
+                    // no server call here: the DT is a client-side panel config (can be persisted server-side in a follow-up)
+                  } catch (err) { console.error(err); alert('Falha ao salvar modificadores'); }
+                }} className="px-3 py-1 bg-white/6 rounded">Salvar</button>
               </div>
             </div>
           </div>

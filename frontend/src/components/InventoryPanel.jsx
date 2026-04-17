@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 
 export default function InventoryPanel({ character, onCharacterUpdate, editable = false }) {
   const [items, setItems] = useState([]);
@@ -16,6 +16,8 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
   const [config, setConfig] = useState({ base_attribute: 'forca', extra_attribute: '', modifiers: [] });
   const [attributesList, setAttributesList] = useState([]);
   const [patrimonio, setPatrimonio] = useState(character.patrimonio || '');
+  // track last saved value to avoid resending identical or overwriting with null
+  const lastSavedPatrimonio = useRef(character.patrimonio !== undefined ? character.patrimonio : null);
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
 
   const fetchItems = async () => {
@@ -61,7 +63,16 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
     } catch (e) { console.error(e); setCatalogResults([]); }
   };
 
-  useEffect(()=>{ fetchItems(); setPatrimonio(character.patrimonio || ''); }, [character?.id]);
+  useEffect(()=>{
+    fetchItems();
+    // initialize local patrimonio only if server has a non-null value.
+    // If server returns null/undefined, keep local state to avoid overwriting user's input.
+    const incoming = character && character.patrimonio;
+    if (incoming !== undefined && incoming !== null) {
+      setPatrimonio(String(incoming));
+      lastSavedPatrimonio.current = incoming;
+    }
+  }, [character?.id]);
 
   useEffect(()=>{
     // load existing status_formula from character if present
@@ -173,35 +184,41 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
     } catch (e) { console.error(e); alert('Erro ao adicionar item do catálogo'); }
   };
 
-  // autosave patrimonio with debounce
-  useEffect(() => {
-    const handle = setTimeout(async () => {
-      try {
-        const raw = patrimonio;
-        const trimmed = raw === undefined || raw === null ? '' : String(raw);
+  // Patrimônio edit flow: show read-only value with an Edit button that opens a modal.
+  const [showPatrimonioModal, setShowPatrimonioModal] = useState(false);
+  const [editPatrimonioValue, setEditPatrimonioValue] = useState('');
 
-        // if empty, send null; otherwise send the raw string (allow free text)
-        const payloadPatrimonio = trimmed === '' ? null : trimmed;
+  const openPatrimonioEditor = () => {
+    setEditPatrimonioValue(patrimonio || '');
+    setShowPatrimonioModal(true);
+  };
 
-        const res = await fetch(`http://localhost:3001/characters/${character.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
-          body: JSON.stringify({ patrimonio: payloadPatrimonio })
-        });
-        if (!res.ok) {
-          let msg = 'Erro ao salvar patrimônio';
-          try { const j = await res.json(); if (j && j.message) msg = j.message; } catch (e) {}
-          throw new Error(msg);
-        }
+  const savePatrimonio = async () => {
+    try {
+      const trimmed = editPatrimonioValue === undefined || editPatrimonioValue === null ? '' : String(editPatrimonioValue);
+      const payload = trimmed === '' ? null : trimmed;
 
-        if (onCharacterUpdate) onCharacterUpdate(prev => ({ ...prev, patrimonio: payloadPatrimonio }));
-      } catch (e) {
-        console.error('Erro ao autosalvar patrimônio', e);
+      const res = await fetch(`http://localhost:3001/characters/${character.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' },
+        body: JSON.stringify({ patrimonio: payload })
+      });
+      if (!res.ok) {
+        let msg = 'Erro ao salvar patrimônio';
+        try { const j = await res.json(); if (j && j.message) msg = j.message; } catch (e) {}
+        throw new Error(msg);
       }
-    }, 800);
 
-    return () => clearTimeout(handle);
-  }, [patrimonio]);
+      // on success, update local state and lastSaved
+      setPatrimonio(payload === null ? '' : payload);
+      lastSavedPatrimonio.current = payload;
+      if (onCharacterUpdate) onCharacterUpdate(prev => ({ ...prev, patrimonio: payload }));
+      setShowPatrimonioModal(false);
+    } catch (e) {
+      console.error('Erro ao salvar patrimônio', e);
+      alert('Erro ao salvar patrimônio');
+    }
+  };
 
   return (
     <div>
@@ -225,6 +242,38 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
             <div className="px-2 py-1 bg-[#021018] border border-white/6 rounded">{character.carga_maxima ?? '-'}</div>
           </div>
         </div>
+
+        <div className="mb-3">
+          <div className="text-sm text-gray-400">Patrimônio</div>
+          <div className="mt-2 flex items-center gap-3">
+            <input readOnly value={patrimonio || ''} aria-label="Patrimônio" className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+            {editable ? (
+              <button onClick={openPatrimonioEditor} aria-label="Editar patrimônio" title="Editar" className="px-2 py-1 border border-white/10 rounded text-sm">
+                {/* simple pencil icon */}
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25z" fill="currentColor"/><path d="M20.71 7.04a1.003 1.003 0 0 0 0-1.41l-2.34-2.34a1.003 1.003 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/></svg>
+              </button>
+            ) : null}
+          </div>
+        </div>
+
+        {/* Patrimônio editor modal */}
+        {showPatrimonioModal ? (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
+            <div className="bg-[#021018] p-4 rounded w-full max-w-lg">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold">Editar Patrimônio</h4>
+                <button onClick={()=>setShowPatrimonioModal(false)} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
+              </div>
+              <div className="space-y-3">
+                <textarea value={editPatrimonioValue} onChange={e=>setEditPatrimonioValue(e.target.value)} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded h-40" />
+                <div className="flex justify-end gap-2">
+                  <button onClick={()=>setShowPatrimonioModal(false)} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
+                  <button onClick={savePatrimonio} className="px-3 py-1 bg-white/6 rounded">Salvar</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
         {/* Modal */}
         {showModal ? (
@@ -401,13 +450,7 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
           </div>
         ) : null}
 
-        <div className="mt-3">
-          <label className="text-xs text-gray-400">Patrimônio</label>
-          <textarea value={patrimonio} onChange={e=>{ setPatrimonio(e.target.value); }} className="w-full p-2 bg-[#021018] text-white border border-white/6 rounded" />
-          <div className="flex justify-end mt-2">
-            <div className="text-xs text-gray-400">(Salvamento automático ativado)</div>
-          </div>
-        </div>
+        {/* removed duplicate editable patrimonio area — use the read-only field + modal editor above */}
       </div>
     </div>
   );

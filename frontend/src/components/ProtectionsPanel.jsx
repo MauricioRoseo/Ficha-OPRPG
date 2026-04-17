@@ -119,10 +119,12 @@ export default function ProtectionsPanel({ character, attributes, protections: i
       <div className="panel panel-protections p-4 rounded">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm text-gray-400">Lista de proteções vinculadas ao personagem</div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowTemplates(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Adicionar proteção</button>
-            <button onClick={() => setShowAddModal(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Criar manual</button>
-          </div>
+          {editable ? (
+            <div className="flex gap-2">
+              <button onClick={() => setShowTemplates(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Adicionar proteção</button>
+              <button onClick={() => setShowAddModal(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Criar manual</button>
+            </div>
+          ) : null}
         </div>
 
         {(!protections || protections.length === 0) ? (
@@ -151,12 +153,18 @@ export default function ProtectionsPanel({ character, attributes, protections: i
                     <td className="py-2">{p.damage_resistance ?? 0}</td>
                     <td className="py-2">{p.encumbrance_penalty ?? 0}</td>
                     <td className="py-2 text-right">
-                      <button onClick={() => { setEditingProtection(p); setShowEditModal(true); }} className="mr-2 text-gray-300 hover:text-white" title="Editar">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>
-                      </button>
-                      <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-500" title="Remover">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
-                      </button>
+                      {editable ? (
+                        <>
+                          <button onClick={() => { setEditingProtection(p); setShowEditModal(true); }} className="mr-2 text-gray-300 hover:text-white" title="Editar">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>
+                          </button>
+                          <button onClick={() => handleDelete(p.id)} className="text-red-400 hover:text-red-500" title="Remover">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
+                          </button>
+                        </>
+                      ) : (
+                        <div className="text-gray-400">&nbsp;</div>
+                      )}
                     </td>
                   </tr>
                 ))}

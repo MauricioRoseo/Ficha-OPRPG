@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import FichaPaper from "../../../../components/FichaPaper";
 import ImageModal from "../../../../components/ImageModal";
@@ -215,6 +215,74 @@ export default function CharacterEditPage() {
     return () => clearTimeout(handler);
   }, [attributes]);
 
+  // Autosave background + phobias + paranormal encounters (debounced)
+  const _skipInitialBackgroundSave = useRef(true);
+  const _lastSavedSnapshot = useRef(null);
+  useEffect(() => {
+    if (!id) return;
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    // avoid saving immediately after load
+    if (_skipInitialBackgroundSave.current) {
+      _skipInitialBackgroundSave.current = false;
+      _lastSavedSnapshot.current = JSON.stringify({ background, phobias, paranormalEncounters });
+      return;
+    }
+
+    const handler = setTimeout(async () => {
+      try {
+        const snapshot = JSON.stringify({ background, phobias, paranormalEncounters });
+        if (_lastSavedSnapshot.current === snapshot) return; // nothing changed
+
+        const payload = {
+          // background fields (send as-is; backend will upsert)
+          historico: (background && background.historico) || null,
+          aparencia: (background && background.aparencia) || null,
+          personalidade: (background && background.personalidade) || null,
+          prato_favorito: (background && background.prato_favorito) || null,
+          pessoas_importantes: (background && background.pessoas_importantes) || null,
+          pertences_queridos: (background && background.pertences_queridos) || null,
+          contatos: (background && background.contatos) || null,
+          traumas: (background && background.traumas) || null,
+          doencas: (background && background.doencas) || null,
+          manias: (background && background.manias) || null,
+          objetivo: (background && background.objetivo) || null
+        };
+
+        // transform phobias: use phobia_id when present, otherwise custom_* fields
+        const phobiasPayload = (phobias || []).map(p => {
+          if (p && p.phobia_id) return { phobia_id: p.phobia_id };
+          return {
+            custom_name: p.custom_name || p.custom_name === '' ? p.custom_name : null,
+            custom_short_description: p.custom_short_description || null,
+            custom_detailed_description: p.custom_detailed_description || null
+          };
+        });
+
+        const encountersPayload = (paranormalEncounters || []).map(e => ({ title: e.title || null, description: e.description || null, sanity_loss: Number(e.sanity_loss) || 0 }));
+
+        const body = { ...payload, phobias: phobiasPayload, paranormal_encounters: encountersPayload };
+
+        const res = await fetch(`http://localhost:3001/characters/${id}/background`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify(body)
+        });
+
+        if (res.ok) {
+          _lastSavedSnapshot.current = snapshot;
+        } else {
+          try { const j = await res.json(); console.error('Erro ao salvar antecedentes:', j); } catch(e) { console.error('Erro ao salvar antecedentes'); }
+        }
+      } catch (e) {
+        console.error('Erro no autosave de antecedentes', e);
+      }
+    }, 800);
+
+    return () => clearTimeout(handler);
+  }, [background, phobias, paranormalEncounters, id]);
+
   if (status) {
     return (
       <div className="p-6">
@@ -238,6 +306,35 @@ export default function CharacterEditPage() {
     if (prestigio >= 20) return "Operador";
     return "Recruta";
   };
+
+  // small helper component to add a custom phobia
+  function PhobiaAdder({ onAdd }) {
+    const [name, setName] = useState('');
+    const [shortDesc, setShortDesc] = useState('');
+    return (
+      <div className="flex flex-col md:flex-row gap-2">
+        <input placeholder="Nome da fobia" value={name} onChange={e=>setName(e.target.value)} className="p-1 rounded bg-[#021018] border border-white/6" />
+        <input placeholder="Resumo" value={shortDesc} onChange={e=>setShortDesc(e.target.value)} className="p-1 rounded bg-[#021018] border border-white/6" />
+        <button onClick={() => { if (!name) return; onAdd({ custom_name: name, custom_short_description: shortDesc }); setName(''); setShortDesc(''); }} className="px-2 py-1 border rounded">Adicionar</button>
+      </div>
+    );
+  }
+
+  function ParanormalAdder({ onAdd }) {
+    const [title, setTitle] = useState('');
+    const [sanity, setSanity] = useState(0);
+    const [desc, setDesc] = useState('');
+    return (
+      <div className="flex flex-col gap-2">
+        <input placeholder="Título" value={title} onChange={e=>setTitle(e.target.value)} className="p-1 rounded bg-[#021018] border border-white/6" />
+        <input placeholder="Perda de sanidade" type="number" value={sanity} onChange={e=>setSanity(Number(e.target.value))} className="p-1 rounded bg-[#021018] border border-white/6 w-40" />
+        <textarea placeholder="Descrição" value={desc} onChange={e=>setDesc(e.target.value)} className="p-1 rounded bg-[#021018] border border-white/6" />
+        <div>
+          <button onClick={() => { if (!title) return; onAdd({ title, description: desc, sanity_loss: Number(sanity) || 0 }); setTitle(''); setSanity(0); setDesc(''); }} className="px-2 py-1 border rounded">Adicionar encontro</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6">
@@ -468,7 +565,7 @@ export default function CharacterEditPage() {
               </div>
 
               <div className="md:col-span-3">
-                <PericiasPanel character={character} attributes={attributes} />
+                <PericiasPanel character={character} attributes={attributes} editable={true} />
               </div>
             </div>
           </FichaPaper>
@@ -476,7 +573,7 @@ export default function CharacterEditPage() {
           <FichaPaper>
             <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
               <div className="md:col-span-3">
-                <AttacksPanel character={character} attributes={attributes} />
+                <AttacksPanel character={character} attributes={attributes} editable={true} />
               </div>
               <div className="md:col-span-3">
                 <ProficienciesPanel character={character} onCharacterUpdate={setCharacter} />
@@ -499,7 +596,7 @@ export default function CharacterEditPage() {
           <FichaPaper>
             <div className="grid grid-cols-1 md:grid-cols-6 gap-8">
               <div className="md:col-span-6">
-                <RituaisPanel character={character} attributes={attributes} />
+                <RituaisPanel character={character} attributes={attributes} editable={true} />
               </div>
             </div>
           </FichaPaper>
@@ -509,17 +606,132 @@ export default function CharacterEditPage() {
           <div className="p-6">
             <h3 className="text-lg font-bold">{(tabs.find(t=>t.tab_key===activeTab)?.title) || (activeTab==='antecedente'?'Antecedente':'Notas')}</h3>
 
-            {/* reuse the antecedente/notes rendering from view page for now */}
+            {/* Editable Antecedentes: background fields, phobias and paranormal encounters with autosave */}
             <div className="mt-4 space-y-6 text-sm">
               <div>
                 <h4 className="font-semibold">Histórico</h4>
-                {background && background.historico ? (
-                  <div className="prose max-w-none mt-2" dangerouslySetInnerHTML={{ __html: background.historico }} />
-                ) : (
-                  <div className="text-gray-400 mt-2">Sem histórico.</div>
-                )}
+                <textarea value={background ? (background.historico || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), historico: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2 h-36" />
               </div>
-              {/* minimal copy to keep page consistent; editable version will be implemented later */}
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold">Aparência</h4>
+                  <textarea value={background ? (background.aparencia || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), aparencia: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2 h-24" />
+                </div>
+
+                <div>
+                  <h4 className="font-semibold">Personalidade</h4>
+                  <textarea value={background ? (background.personalidade || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), personalidade: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2 h-24" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <h4 className="font-semibold">Prato favorito</h4>
+                  <input value={background ? (background.prato_favorito || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), prato_favorito: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2" />
+                </div>
+                <div>
+                  <h4 className="font-semibold">Pessoas importantes</h4>
+                  <input value={background ? (background.pessoas_importantes || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), pessoas_importantes: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2" />
+                </div>
+                <div>
+                  <h4 className="font-semibold">Pertences queridos</h4>
+                  <input value={background ? (background.pertences_queridos || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), pertences_queridos: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <h4 className="font-semibold">Contatos</h4>
+                  <textarea value={background ? (background.contatos || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), contatos: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2 h-24" />
+                </div>
+
+                <div>
+                  <h4 className="font-semibold">Traumas</h4>
+                  <textarea value={background ? (background.traumas || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), traumas: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2 h-24" />
+                </div>
+
+                <div>
+                  <h4 className="font-semibold">Doenças</h4>
+                  <textarea value={background ? (background.doencas || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), doencas: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2 h-24" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="font-semibold">Manias</h4>
+                  <input value={background ? (background.manias || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), manias: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2" />
+                </div>
+                <div>
+                  <h4 className="font-semibold">Objetivo</h4>
+                  <input value={background ? (background.objetivo || '') : ''} onChange={e=>setBackground(b=>({...(b||{}), objetivo: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6 mt-2" />
+                </div>
+              </div>
+
+              {/* Fobias CRUD */}
+              <div>
+                <h4 className="font-semibold">Fobias</h4>
+                <div className="mt-2 space-y-2">
+                  {(phobias || []).map((p, idx) => (
+                    <div key={idx} className="p-2 border border-white/6 rounded bg-[#021018]">
+                      {p.phobia_id ? (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <strong>{p.phobia_name || '(fobia)'}</strong>
+                            {p.phobia_short_description ? <div className="text-xs text-gray-400">{p.phobia_short_description}</div> : null}
+                          </div>
+                          <div className="flex gap-2">
+                            <button onClick={() => {
+                              // remove
+                              setPhobias(prev => prev.filter((_, i) => i !== idx));
+                            }} className="text-xs px-2 py-1 border rounded">Remover</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <input placeholder="Nome" value={p.custom_name || ''} onChange={e=>{
+                            const v = e.target.value;
+                            setPhobias(prev => prev.map((it,i)=> i===idx ? ({ ...(it||{}), custom_name: v }) : it));
+                          }} className="w-full p-1 rounded bg-[#021018] border border-white/6" />
+                          <input placeholder="Resumo" value={p.custom_short_description || ''} onChange={e=>{
+                            const v = e.target.value;
+                            setPhobias(prev => prev.map((it,i)=> i===idx ? ({ ...(it||{}), custom_short_description: v }) : it));
+                          }} className="w-full p-1 mt-1 rounded bg-[#021018] border border-white/6" />
+                          <div className="mt-2 flex gap-2">
+                            <button onClick={()=> setPhobias(prev => prev.filter((_,i)=> i!==idx)) } className="text-xs px-2 py-1 border rounded">Remover</button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* add new custom phobia */}
+                  <div className="p-2 border border-white/6 rounded bg-transparent">
+                    <PhobiaAdder onAdd={(obj) => setPhobias(prev => ([...(prev||[]), obj]))} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Paranormal encounters CRUD */}
+              <div>
+                <h4 className="font-semibold">Encontros Paranormais</h4>
+                <div className="mt-2 space-y-2">
+                  {(paranormalEncounters || []).map((e, idx) => (
+                    <div key={idx} className="p-2 border border-white/6 rounded bg-[#021018]">
+                      <input placeholder="Título" value={e.title || ''} onChange={ev=> setParanormalEncounters(prev => prev.map((it,i)=> i===idx ? ({ ...(it||{}), title: ev.target.value }) : it))} className="w-full p-1 rounded bg-[#021018] border border-white/6" />
+                      <input placeholder="Perda de sanidade" type="number" value={e.sanity_loss || 0} onChange={ev=> setParanormalEncounters(prev => prev.map((it,i)=> i===idx ? ({ ...(it||{}), sanity_loss: Number(ev.target.value) || 0 }) : it))} className="w-32 p-1 mt-1 rounded bg-[#021018] border border-white/6" />
+                      <textarea placeholder="Descrição" value={e.description || ''} onChange={ev=> setParanormalEncounters(prev => prev.map((it,i)=> i===idx ? ({ ...(it||{}), description: ev.target.value }) : it))} className="w-full p-1 mt-1 rounded bg-[#021018] border border-white/6" />
+                      <div className="mt-2">
+                        <button onClick={()=> setParanormalEncounters(prev => prev.filter((_,i)=> i!==idx)) } className="text-xs px-2 py-1 border rounded">Remover</button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <ParanormalAdder onAdd={(obj) => setParanormalEncounters(prev => ([...(prev||[]), obj]))} />
+                </div>
+              </div>
+
+              <div className="text-xs text-gray-400">Alterações são salvas automaticamente (debounce 800ms).</div>
             </div>
           </div>
         </FichaPaper>

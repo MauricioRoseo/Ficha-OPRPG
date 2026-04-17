@@ -9,6 +9,8 @@ router.post('/', authMiddleware, CharacterController.create);
 // listar personagens
 router.get('/', authMiddleware, CharacterController.findAll);
 router.get('/:id/full', authMiddleware, CharacterController.getFull);
+// debug: get patrimonio value
+router.get('/:id/patrimonio', authMiddleware, CharacterController.getPatrimonio);
 // atualizar campos do personagem (stats)
 router.put('/:id', authMiddleware, CharacterController.update);
 // atualizar campos básicos/descrição/imagens do personagem

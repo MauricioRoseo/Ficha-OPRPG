@@ -113,8 +113,8 @@ const seed = async () => {
       await ensureColumnExists('characters', 'esquiva', 'esquiva INT DEFAULT 0');
       await ensureColumnExists('characters', 'bloqueio', 'bloqueio INT DEFAULT 0');
 
-      await ensureColumnExists('characters', 'proficiencias', 'proficiencias TEXT');
-      await ensureColumnExists('characters', 'patrimonio', 'patrimonio INT DEFAULT NULL');
+  await ensureColumnExists('characters', 'proficiencias', 'proficiencias TEXT');
+  await ensureColumnExists('characters', 'patrimonio', 'patrimonio TEXT DEFAULT NULL');
       await ensureColumnExists('characters', 'patente', "patente VARCHAR(150) DEFAULT NULL");
       await ensureColumnExists('characters', 'carga_atual', 'carga_atual INT DEFAULT 0');
       await ensureColumnExists('characters', 'carga_maxima', 'carga_maxima INT DEFAULT 0');

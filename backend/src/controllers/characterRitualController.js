@@ -34,6 +34,15 @@ const CharacterRitualController = {
       res.json({ message: 'Ritual removido' });
     });
   }
+  ,
+  update: (req, res) => {
+    const { characterId, id } = req.params;
+    const data = req.body || {};
+    CharacterRitualModel.update(characterId, id, data, (err, result) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: 'Ritual atualizado' });
+    });
+  }
 };
 
 module.exports = CharacterRitualController;

@@ -55,6 +55,54 @@ const CharacterRitualModel = {
     db.query(sql, [characterId], callback);
   },
 
+  update: (characterId, id, data, callback) => {
+    const sql = `UPDATE character_rituals SET
+      dt_resistencia = ?,
+      circulo = ?,
+      snapshot_symbol = ?,
+      snapshot_symbol_secondary = ?,
+      dt_modifiers = ?,
+      snapshot_name = COALESCE(?, snapshot_name),
+      snapshot_element = COALESCE(?, snapshot_element),
+      snapshot_description = COALESCE(?, snapshot_description),
+      snapshot_execution = COALESCE(?, snapshot_execution),
+      snapshot_alcance = COALESCE(?, snapshot_alcance),
+      snapshot_duration = COALESCE(?, snapshot_duration),
+      snapshot_resistencia_pericia_id = COALESCE(?, snapshot_resistencia_pericia_id),
+      snapshot_resistencia_pericia_name = COALESCE(?, snapshot_resistencia_pericia_name),
+      snapshot_aprimoramento_discente = COALESCE(?, snapshot_aprimoramento_discente),
+      snapshot_custo_aprimoramento_discente = COALESCE(?, snapshot_custo_aprimoramento_discente),
+      snapshot_descricao_aprimoramento_discente = COALESCE(?, snapshot_descricao_aprimoramento_discente),
+      snapshot_aprimoramento_verdadeiro = COALESCE(?, snapshot_aprimoramento_verdadeiro),
+      snapshot_custo_aprimoramento_verdadeiro = COALESCE(?, snapshot_custo_aprimoramento_verdadeiro),
+      snapshot_descricao_aprimoramento_verdadeiro = COALESCE(?, snapshot_descricao_aprimoramento_verdadeiro)
+      WHERE id = ? AND character_id = ?`;
+    const values = [
+      data.dt_resistencia || null,
+      data.circulo || null,
+      data.snapshot_symbol || null,
+      data.snapshot_symbol_secondary || null,
+      data.dt_modifiers ? JSON.stringify(data.dt_modifiers) : null,
+      data.snapshot_name || null,
+      data.snapshot_element || null,
+      data.snapshot_description || null,
+      data.snapshot_execution || null,
+      data.snapshot_alcance || null,
+      data.snapshot_duration || null,
+      data.snapshot_resistencia_pericia_id || null,
+      data.snapshot_resistencia_pericia_name || null,
+      data.snapshot_aprimoramento_discente || null,
+      data.snapshot_custo_aprimoramento_discente || null,
+      data.snapshot_descricao_aprimoramento_discente || null,
+      data.snapshot_aprimoramento_verdadeiro || null,
+      data.snapshot_custo_aprimoramento_verdadeiro || null,
+      data.snapshot_descricao_aprimoramento_verdadeiro || null,
+      id,
+      characterId
+    ];
+    db.query(sql, values, callback);
+  },
+
   remove: (id, callback) => {
     db.query('DELETE FROM character_rituals WHERE id = ?', [id], callback);
   }

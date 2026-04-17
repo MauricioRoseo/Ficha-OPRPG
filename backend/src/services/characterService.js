@@ -219,9 +219,13 @@ const CharacterService = {
         bloqueio: data.bloqueio,
         morrendo: data.morrendo,
         enlouquecendo: data.enlouquecendo,
-        proficiencias: data.proficiencias,
-        patrimonio: data.patrimonio
+        proficiencias: data.proficiencias
       };
+
+      // Only include patrimonio in payload when explicitly provided by caller
+      if (Object.prototype.hasOwnProperty.call(data, 'patrimonio')) {
+        payload.patrimonio = data.patrimonio;
+      }
 
       CharacterModelLocal.update(characterId, payload, (err2) => {
         if (err2) return callback(err2);

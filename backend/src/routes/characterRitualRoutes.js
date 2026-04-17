@@ -15,5 +15,7 @@ router.get('/rituals/character/:characterId', authMiddleware, CharacterRitualCon
 
 // remover ritual do personagem
 router.delete('/rituals/character/:characterId/:id', authMiddleware, CharacterRitualController.removeFromCharacter);
+// atualizar ritual do personagem (editar circulo, dt_resistencia, símbolos, modifiers)
+router.put('/rituals/character/:characterId/:id', authMiddleware, CharacterRitualController.update);
 
 module.exports = router;

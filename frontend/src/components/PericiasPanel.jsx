@@ -3,7 +3,7 @@
 import React, { useEffect, useState } from "react";
 import PericiaTemplatesModal from "./PericiaTemplatesModal";
 
-export default function PericiasPanel({ character, attributes }) {
+export default function PericiasPanel({ character, attributes, editable = false }) {
   const data = attributes || character || {};
   const [pericias, setPericias] = useState([]);
   const [showDescFor, setShowDescFor] = useState(null);
@@ -49,10 +49,12 @@ export default function PericiasPanel({ character, attributes }) {
       <div className="panel panel-pericias p-4 rounded">
         <div className="flex items-center justify-between mb-3">
           <div className="text-sm text-gray-400">Perícias vinculadas ao personagem</div>
-          <div className="flex gap-2">
-            <button onClick={() => setShowTemplates(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Adicionar perícia</button>
-            <button onClick={() => setShowAdd(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Criar manual</button>
-          </div>
+          {editable ? (
+            <div className="flex gap-2">
+              <button onClick={() => setShowTemplates(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Adicionar perícia</button>
+              <button onClick={() => setShowAdd(true)} className="border border-white/10 px-2 py-1 text-sm rounded">Criar manual</button>
+            </div>
+          ) : null}
         </div>
 
         {(!pericias || pericias.length === 0) ? (
@@ -90,19 +92,23 @@ export default function PericiasPanel({ character, attributes }) {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
                           </button>
                         ) : null}
-                          <button onClick={async ()=>{
-                          if (!confirm('Remover perícia do personagem?')) return;
-                          try {
-                            const res = await fetch(`http://localhost:3001/features/character/${character.id}/${p.id}`, { method: 'DELETE', headers: { Authorization: token ? `Bearer ${token}` : '' } });
-                            if (!res.ok) throw new Error('Erro ao remover');
-                            await fetchCharacterPericias();
-                          } catch (e) { console.error(e); alert('Erro ao remover perícia'); }
-                        }} className="text-red-400 hover:text-red-500" title="Remover perícia">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
-                        </button>
-                          <button onClick={() => { setEditingPericia(p); setShowEdit(true); }} title="Editar perícia" className="text-gray-300 hover:text-white ml-2 mr-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>
-                          </button>
+                          {editable ? (
+                            <>
+                              <button onClick={async ()=>{
+                                if (!confirm('Remover perícia do personagem?')) return;
+                                try {
+                                  const res = await fetch(`http://localhost:3001/features/character/${character.id}/${p.id}`, { method: 'DELETE', headers: { Authorization: token ? `Bearer ${token}` : '' } });
+                                  if (!res.ok) throw new Error('Erro ao remover');
+                                  await fetchCharacterPericias();
+                                } catch (e) { console.error(e); alert('Erro ao remover perícia'); }
+                              }} className="text-red-400 hover:text-red-500" title="Remover perícia">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 6h18M8 6v12a2 2 0 002 2h4a2 2 0 002-2V6M10 11v6M14 11v6"/></svg>
+                              </button>
+                              <button onClick={() => { setEditingPericia(p); setShowEdit(true); }} title="Editar perícia" className="text-gray-300 hover:text-white ml-2 mr-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15.232 5.232l3.536 3.536M9 11l6-6 3 3-6 6H9v-3z"/></svg>
+                              </button>
+                            </>
+                          ) : null}
                       </td>
                     </tr>
                 ))}

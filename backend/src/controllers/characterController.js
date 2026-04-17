@@ -51,6 +51,9 @@ const CharacterController = {
     const userId = req.user.id;
     const data = req.body;
 
+    // DEBUG: log incoming update payload for troubleshooting patrimonio persistence
+    try { console.log('[DEBUG] Character update request', { characterId: id, userId, payload: data }); } catch (e) {}
+
     CharacterService.updateCharacter(id, userId, data, (err, result) => {
       if (err) {
         if (err.message === 'Acesso negado') return res.status(403).json(err);
@@ -139,6 +142,18 @@ const CharacterController = {
         if (err2) return res.status(500).json(err2);
         res.json(notes || []);
       });
+    });
+  },
+
+  getPatrimonio: (req, res) => {
+    const { id } = req.params; // character id
+    const userId = req.user.id;
+    const CharacterModel = require('../models/characterModel');
+    CharacterModel.findById(id, (err, character) => {
+      if (err) return res.status(500).json(err);
+      if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
+      if (character.user_id !== userId) return res.status(403).json({ message: 'Acesso negado' });
+      return res.json({ id: character.id, patrimonio: character.patrimonio });
     });
   },
 

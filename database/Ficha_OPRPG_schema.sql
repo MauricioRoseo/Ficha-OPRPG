@@ -146,12 +146,20 @@ CREATE TABLE IF NOT EXISTS attacks (
     id INT AUTO_INCREMENT PRIMARY KEY,
     character_id INT NOT NULL,
 
+    -- legacy name kept for compatibility; new column `weapon` used by model/frontend
     name VARCHAR(100) NOT NULL,
-    attack_bonus VARCHAR(20),
-    damage VARCHAR(50),
-    crit VARCHAR(20),
-    range_type VARCHAR(50),
-    ammo VARCHAR(20),
+    -- weapon (display name) used by frontend
+    weapon VARCHAR(100) DEFAULT NULL,
+    -- damage_type corresponds to damage category (e.g. fogo, corte)
+    damage_type VARCHAR(50) DEFAULT NULL,
+    -- base_pericia stored as string like '3d20+5'
+    base_pericia VARCHAR(100) DEFAULT NULL,
+    damage VARCHAR(50) DEFAULT NULL,
+    -- crit_margin and crit_multiplier stored numerically
+    crit_margin INT DEFAULT NULL,
+    crit_multiplier INT DEFAULT NULL,
+    range_type VARCHAR(50) DEFAULT NULL,
+    ammo VARCHAR(20) DEFAULT NULL,
 
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
@@ -241,6 +249,11 @@ SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATAB
 SET @sql = IF(@c=0, 'ALTER TABLE characters ADD COLUMN defense_formula JSON DEFAULT NULL', 'SELECT "defense_formula already exists"');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- ensure patrimonio is TEXT (if it was previously created as INT by older seed scripts)
+SELECT DATA_TYPE INTO @dt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='characters' AND COLUMN_NAME='patrimonio';
+SET @sql = IF(@dt IS NULL, 'SELECT "patrimonio missing"', IF(@dt <> 'text', 'ALTER TABLE characters MODIFY patrimonio TEXT DEFAULT NULL', 'SELECT "patrimonio already text"'));
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- link protections to templates (nullable)
 ALTER TABLE protections ADD COLUMN template_id INT DEFAULT NULL;
 ALTER TABLE protections ADD KEY template_id_idx (template_id);
@@ -318,12 +331,18 @@ CREATE TABLE IF NOT EXISTS character_rituals (
     snapshot_descricao_aprimoramento_verdadeiro TEXT DEFAULT NULL,
     snapshot_symbol TEXT,
     snapshot_symbol_secondary TEXT,
+    dt_modifiers JSON DEFAULT NULL,
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE,
     FOREIGN KEY (ritual_catalog_id) REFERENCES rituals_catalog(id) ON DELETE SET NULL
 );
+
+-- add dt_modifiers to character_rituals if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='character_rituals' AND COLUMN_NAME='dt_modifiers';
+SET @sql = IF(@c=0, 'ALTER TABLE character_rituals ADD COLUMN dt_modifiers JSON DEFAULT NULL', 'SELECT "dt_modifiers already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- Systems
 CREATE TABLE IF NOT EXISTS systems (
