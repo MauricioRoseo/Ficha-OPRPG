@@ -17,21 +17,44 @@ const CharacterController = {
     });
   },
 
-  findAll: (req, res) => {
-    const userId = req.user.id;
+  delete: (req, res) => {
+    const { id } = req.params; // character id
+    const user = req.user || {};
+    const CharacterModel = require('../models/characterModel');
 
-    CharacterService.getCharactersByUser(userId, (err, results) => {
+    CharacterModel.findById(id, (err, character) => {
       if (err) return res.status(500).json(err);
+      if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
+      if (character.user_id !== (user && user.id) && !(user && (user.role === 'master' || user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
-      res.json(results);
+      CharacterModel.deleteById(id, (err2) => {
+        if (err2) return res.status(500).json(err2);
+        res.json({ message: 'Personagem removido' });
+      });
     });
+  },
+
+  findAll: (req, res) => {
+    // if master/admin, return all characters; otherwise return only user's characters
+    const user = req.user || {};
+    if (user.role === 'master' || user.role === 'admin') {
+      CharacterService.getAllCharacters((err, results) => {
+        if (err) return res.status(500).json(err);
+        return res.json(results);
+      });
+    } else {
+      CharacterService.getCharactersByUser(user.id, (err, results) => {
+        if (err) return res.status(500).json(err);
+        res.json(results);
+      });
+    }
   },
 
   getFull: (req, res) => {
     const { id } = req.params;
-    const userId = req.user.id;
+    const user = req.user || {};
 
-    CharacterService.getFullCharacter(id, userId, (err, result) => {
+    CharacterService.getFullCharacter(id, user, (err, result) => {
       if (err) {
         // 🔥 trata erro corretamente
         if (err.message === 'Acesso negado') {
@@ -48,13 +71,14 @@ const CharacterController = {
 
   update: (req, res) => {
     const { id } = req.params;
-    const userId = req.user.id;
-    const data = req.body;
+
+  const user = req.user || {};
+  const data = req.body;
 
     // DEBUG: log incoming update payload for troubleshooting patrimonio persistence
     try { console.log('[DEBUG] Character update request', { characterId: id, userId, payload: data }); } catch (e) {}
 
-    CharacterService.updateCharacter(id, userId, data, (err, result) => {
+    CharacterService.updateCharacter(id, user, data, (err, result) => {
       if (err) {
         if (err.message === 'Acesso negado') return res.status(403).json(err);
         return res.status(500).json(err);
@@ -67,7 +91,7 @@ const CharacterController = {
 
   updateBackground: (req, res) => {
     const { id } = req.params; // character id
-    const userId = req.user.id;
+    const user = req.user || {};
     const payload = req.body || {};
 
     const CharacterModel = require('../models/characterModel');
@@ -79,7 +103,7 @@ const CharacterController = {
     CharacterModel.findById(id, (err, character) => {
       if (err) return res.status(500).json(err);
       if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-      if (character.user_id !== userId) return res.status(403).json({ message: 'Acesso negado' });
+      if (character.user_id !== (user && user.id) && !(user && (user.role === 'master' || user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
       // upsert background
       BackgroundModel.findByCharacterId(id, (err2, bg) => {

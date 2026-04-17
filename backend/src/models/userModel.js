@@ -4,11 +4,11 @@ const UserModel = {
 
   create: (user, callback) => {
     const sql = `
-      INSERT INTO users (name, email, password)
-      VALUES (?, ?, ?)
+      INSERT INTO users (name, email, password, role)
+      VALUES (?, ?, ?, ?)
     `;
 
-    db.query(sql, [user.name, user.email, user.password], callback);
+    db.query(sql, [user.name, user.email, user.password, user.role || 'player'], callback);
   },
 
   findByEmail: (email, callback) => {

@@ -8,8 +8,8 @@ const ResistanceController = {
 
     CharacterModel.findById(characterId, (err, character) => {
       if (err) return res.status(500).json(err);
-      if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-      if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+  if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
+  if (!req.user || (character.user_id !== req.user.id && !(req.user.role === 'master' || req.user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
       ResistanceModel.updateByCharacterId(characterId, payload, (err2, updated) => {
         if (err2) return res.status(500).json(err2);

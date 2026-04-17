@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS users (
     name VARCHAR(100) NOT NULL,
     email VARCHAR(150) UNIQUE NOT NULL,
     password VARCHAR(255) NOT NULL,
+    -- role: 'player' (default) or 'master' (GM) or 'admin' for system admins
+    role ENUM('player','master','admin') DEFAULT 'player',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -247,6 +249,11 @@ PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 -- add defense_formula if missing
 SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='characters' AND COLUMN_NAME='defense_formula';
 SET @sql = IF(@c=0, 'ALTER TABLE characters ADD COLUMN defense_formula JSON DEFAULT NULL', 'SELECT "defense_formula already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- add role to users if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='users' AND COLUMN_NAME='role';
+SET @sql = IF(@c=0, "ALTER TABLE users ADD COLUMN role ENUM('player','master','admin') DEFAULT 'player'", 'SELECT "role already exists"');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
 -- ensure patrimonio is TEXT (if it was previously created as INT by older seed scripts)

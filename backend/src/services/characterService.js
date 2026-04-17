@@ -26,11 +26,13 @@ const CharacterService = {
   },
 
   // Retorna personagem completo com cálculos de status (não persiste aqui)
-  getFullCharacter: (characterId, userId, callback) => {
+  // userObj is the authenticated user object from the token (contains id and role)
+  getFullCharacter: (characterId, userObj, callback) => {
     CharacterModel.findById(characterId, (err, character) => {
       if (err) return callback(err);
       if (!character) return callback({ message: 'Personagem não encontrado' });
-      if (character.user_id !== userId) return callback({ message: 'Acesso negado' });
+      // allow access if owner or if user is master/admin
+      if (character.user_id !== (userObj && userObj.id) && !(userObj && (userObj.role === 'master' || userObj.role === 'admin'))) return callback({ message: 'Acesso negado' });
 
       AttributeModel.findByCharacterId(characterId, (err2, attributes) => {
         if (err2) return callback(err2);
@@ -200,13 +202,13 @@ const CharacterService = {
   },
 
   // atualiza campos de status e proficiências
-  updateCharacter: (characterId, userId, data, callback) => {
+  updateCharacter: (characterId, userObj, data, callback) => {
     const CharacterModelLocal = require('../models/characterModel');
 
     CharacterModelLocal.findById(characterId, (err, character) => {
       if (err) return callback(err);
       if (!character) return callback({ message: 'Personagem não encontrado' });
-      if (character.user_id !== userId) return callback({ message: 'Acesso negado' });
+      if (character.user_id !== (userObj && userObj.id) && !(userObj && (userObj.role === 'master' || userObj.role === 'admin'))) return callback({ message: 'Acesso negado' });
 
       const payload = {
         vida_atual: data.vida_atual,

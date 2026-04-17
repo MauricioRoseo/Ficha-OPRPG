@@ -26,7 +26,7 @@ const seed = async () => {
     console.log('🌱 Iniciando seed de teste expandida...');
 
     // helper para criar usuário
-    const createUser = async (name, email, plainPassword = '1234') => {
+    const createUser = async (name, email, plainPassword = '1234', role = 'player') => {
       // check existing
       const existing = await query(`SELECT id FROM users WHERE email = ?`, [email]);
       if (existing && existing.length > 0) {
@@ -35,7 +35,9 @@ const seed = async () => {
       }
 
       const hashed = await bcrypt.hash(plainPassword, 10);
-      const res = await query(`INSERT INTO users (name, email, password) VALUES (?, ?, ?)`, [name, email, hashed]);
+      // ensure role column exists
+      try { await ensureColumnExists('users', 'role', "role ENUM('player','master','admin') DEFAULT 'player'"); } catch (e) {}
+      const res = await query(`INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)`, [name, email, hashed, role || 'player']);
       console.log('✔ Usuário criado:', name, res.insertId);
       return res.insertId;
     };
@@ -79,10 +81,13 @@ const seed = async () => {
     };
 
     // criar vários usuários
-    const u1 = await createUser('Teste', 'teste@email.com');
+  const u1 = await createUser('Teste', 'teste@email.com');
     const u2 = await createUser('Alice Silva', 'alice@example.com');
     const u3 = await createUser('Carlos Ramos', 'carlos@example.com');
     const u4 = await createUser('Mariana Costa', 'mariana@example.com');
+
+  // create master / admin user for campaign master (login: testeadmin, senha: 1234)
+  const master = await createUser('Mestre Teste', 'testeadmin', '1234', 'master');
 
     // ensure characters table has the newer columns expected by seed scripts
     try {

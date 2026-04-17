@@ -224,3 +224,9 @@ CharacterModel.updateDetails = (id, data, callback) => {
 
   db.query(sql, values, callback);
 };
+
+// delete a character (cascades will remove dependent rows)
+CharacterModel.deleteById = (id, callback) => {
+  const sql = `DELETE FROM characters WHERE id = ?`;
+  db.query(sql, [id], callback);
+};

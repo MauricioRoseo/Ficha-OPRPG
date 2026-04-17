@@ -30,7 +30,7 @@ const ProtectionController = {
       CharacterModel.findById(protection.character_id, (err2, character) => {
         if (err2) return res.status(500).json(err2);
         if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-        if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+  if (!req.user || (character.user_id !== req.user.id && !(req.user.role === 'master' || req.user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
         ProtectionModel.update(id, data, (err3) => {
           if (err3) return res.status(500).json(err3);
@@ -105,9 +105,9 @@ const ProtectionController = {
     if (!data.character_id || !data.name) return res.status(400).json({ message: 'character_id e name são obrigatórios' });
 
     CharacterModel.findById(data.character_id, (err, character) => {
-      if (err) return res.status(500).json(err);
-      if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-      if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+  if (err) return res.status(500).json(err);
+  if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
+  if (!req.user || (character.user_id !== req.user.id && !(req.user.role === 'master' || req.user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
       ProtectionModel.create(data, (err2, result) => {
         if (err2) return res.status(500).json(err2);
@@ -176,9 +176,9 @@ const ProtectionController = {
     if (!template_id || !character_id) return res.status(400).json({ message: 'template_id e character_id são obrigatórios' });
 
     CharacterModel.findById(character_id, (err, character) => {
-      if (err) return res.status(500).json(err);
-      if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-      if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+  if (err) return res.status(500).json(err);
+  if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
+  if (!req.user || (character.user_id !== req.user.id && !(req.user.role === 'master' || req.user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
       const TemplateModel = require('../models/protectionTemplateModel');
       TemplateModel.findById(template_id, (err2, templateRow) => {
@@ -255,9 +255,9 @@ const ProtectionController = {
       if (!protection) return res.status(404).json({ message: 'Proteção não encontrada' });
 
       CharacterModel.findById(protection.character_id, (err2, character) => {
-        if (err2) return res.status(500).json(err2);
-        if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-        if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+  if (err2) return res.status(500).json(err2);
+  if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
+  if (!req.user || (character.user_id !== req.user.id && !(req.user.role === 'master' || req.user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
         ProtectionModel.deleteById(id, (err3) => {
           if (err3) return res.status(500).json(err3);
