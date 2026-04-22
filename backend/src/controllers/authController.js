@@ -27,7 +27,8 @@ const AuthController = {
       if (err) return res.status(500).json(err);
       if (!user) return res.status(404).json({ message: 'Usuário não encontrado' });
 
-      res.json({ id: user.id, name: user.name, email: user.email });
+      // include role so frontend can show admin/master UI elements
+      res.json({ id: user.id, name: user.name, email: user.email, role: user.role || 'player' });
     });
   }
 

@@ -2,46 +2,49 @@
 
 import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from 'next/link';
 
 export default function Header() {
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
+  const [role, setRole] = useState('player');
 
   // read token only on client after hydration to avoid SSR/CSR mismatch
   // keep initial name as empty string so server and client initial HTML match
   useEffect(() => {
     const token = localStorage.getItem('token');
+    console.debug('[Header] token on mount:', !!token);
     if (!token) return;
 
-    // prefer fetching user info from backend (works even if token payload is minimal)
+    // Immediately decode token to set a first-pass UI state so role/name
+    // reflect the logged-in user without waiting for the network.
+    try {
+      const p = token.split('.')[1];
+      const payload = JSON.parse(atob(p));
+      console.debug('[Header] token payload (fast):', payload);
+      setName(payload.name || payload.email || '');
+      setRole(payload.role || 'player');
+    } catch (err) {
+      console.debug('[Header] token decode failed (fast)');
+    }
+
+    // Then fetch authoritative user info from the API and override if available.
     fetch('http://localhost:3001/auth/me', {
       headers: { Authorization: `Bearer ${token}` }
     }).then(async (res) => {
       if (!res.ok) {
-        // fallback: try decode token payload
-        try {
-          const p = token.split('.')[1];
-          const payload = JSON.parse(atob(p));
-          setName(payload.name || payload.email || '');
-        } catch {
-          // ignore
-        }
+        console.debug('[Header] /auth/me returned', res.status);
         return;
       }
 
       const data = await res.json();
+      console.debug('[Header] /auth/me data:', data);
       setName(data.name || data.email || '');
-    }).catch(() => {
-      // on error fallback to token decode
-      try {
-        const p = token.split('.')[1];
-        const payload = JSON.parse(atob(p));
-        setName(payload.name || payload.email || '');
-      } catch {
-        // ignore
-      }
+      setRole(data.role || 'player');
+    }).catch((err) => {
+      console.debug('[Header] /auth/me fetch failed', err && err.message);
     });
   }, []);
 
@@ -49,7 +52,11 @@ export default function Header() {
   if (pathname === "/") return null;
 
   const handleLogout = () => {
+    console.debug('[Header] logout: clearing token and header state');
     localStorage.removeItem('token');
+    setName('');
+    setRole('player');
+    setOpen(false);
     router.push('/');
   };
 
@@ -59,6 +66,13 @@ export default function Header() {
         <div className="flex items-center gap-4">
           <h1 className="logo-special text-2xl tracking-wider">FICHA OPRPG</h1>
           <p className="text-red-500 text-sm">ARQUIVOS CONFIDENCIAIS</p>
+
+          {/* show master/admin navigation link */}
+          {(role === 'master' || role === 'admin') && (
+            <nav className="ml-6">
+              <Link href="/master/pdj" className="text-sm underline">PDJ (Personagens de Jogador)</Link>
+            </nav>
+          )}
         </div>
 
         <div className="relative">

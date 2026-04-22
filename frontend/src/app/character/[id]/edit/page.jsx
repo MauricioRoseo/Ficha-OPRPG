@@ -33,6 +33,8 @@ export default function CharacterEditPage() {
   const [activeTab, setActiveTab] = useState('ficha');
   const [status, setStatus] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserRole, setCurrentUserRole] = useState('player');
   const [classesList, setClassesList] = useState([]);
   const [trailsList, setTrailsList] = useState([]);
   const [originsList, setOriginsList] = useState([]);
@@ -54,6 +56,8 @@ export default function CharacterEditPage() {
       if (parts.length >= 2) {
         const payload = JSON.parse(atob(parts[1]));
         setCurrentUserName(payload.name || payload.email || "");
+        setCurrentUserId(payload.id || null);
+        setCurrentUserRole(payload.role || payload.roles || 'player');
       }
     } catch (e) {}
 
@@ -342,13 +346,13 @@ export default function CharacterEditPage() {
         <div className="flex items-center justify-between py-4 px-6">
           <div>
             <h2 className="text-lg font-bold">Editar Ficha: {character.name}</h2>
-            <p className="text-xs text-gray-400">Jogador: {currentUserName || character.user_name || "-"}</p>
+            <p className="text-xs text-gray-400">Jogador: {character.user_name || (character.user_id && character.user_id === currentUserId ? currentUserName : (character.user_email || '-'))}</p>
           </div>
 
           <div>
             <div className="flex gap-2">
-              <button
-                onClick={() => router.push(`/character/${id}`)}
+                <button
+                onClick={() => router.push(currentUserRole === 'master' || currentUserRole === 'admin' ? '/master/pdj' : `/character/${id}`)}
                 className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
               >
                 Voltar à visualização
@@ -381,7 +385,7 @@ export default function CharacterEditPage() {
                 </div>
                 <div className="md:col-span-1">
                   <label className="text-xs text-gray-400">Jogador</label>
-                  <div className="p-2 text-sm text-gray-300">{currentUserName || character.user_name || '-'}</div>
+                  <div className="p-2 text-sm text-gray-300">{character.user_name || (character.user_id && character.user_id === currentUserId ? currentUserName : (character.user_email || '-'))}</div>
                 </div>
               </div>
 
@@ -471,7 +475,7 @@ export default function CharacterEditPage() {
 
                       <div className="col-span-2">
                         <p className="text-gray-400 text-xs">Jogador</p>
-                        <p>{currentUserName || character.user_name || "-"}</p>
+                        <p>{character.user_name || (character.user_id && character.user_id === currentUserId ? currentUserName : (character.user_email || '-'))}</p>
                       </div>
                 </div>
               </div>

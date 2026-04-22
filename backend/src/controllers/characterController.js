@@ -254,7 +254,8 @@ module.exports = CharacterController;
 // update basic character details (profile/config)
 CharacterController.updateDetails = (req, res) => {
   const { id } = req.params;
-  const userId = req.user.id;
+  const user = req.user || {};
+  const userId = user.id;
   const payload = req.body || {};
 
   const CharacterModel = require('../models/characterModel');
@@ -265,7 +266,8 @@ CharacterController.updateDetails = (req, res) => {
   CharacterModel.findById(id, (err, character) => {
     if (err) return res.status(500).json(err);
     if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-    if (character.user_id !== userId) return res.status(403).json({ message: 'Acesso negado' });
+  // owners can update their own character; additionally allow 'master' and 'admin' roles
+  if (character.user_id !== userId && !(user && (user.role === 'master' || user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
     // merge provided payload with existing character to avoid setting NOT NULL fields to null
     const mergedPayload = {

@@ -39,12 +39,35 @@ export default function Login() {
 
       if (data && data.token) {
         localStorage.setItem("token", data.token);
+        try {
+          const parts = data.token.split('.');
+          if (parts && parts.length > 1) {
+            const payload = JSON.parse(atob(parts[1]));
+            console.debug('[Login] received token, role=', payload.role, 'email=', payload.email);
+          }
+        } catch (e) {
+          console.debug('[Login] received token (unable to decode)');
+        }
         pushLog('> acesso autorizado');
         pushLog('> carregando painel...');
 
-        setTimeout(() => {
-          router.push("/dashboard");
-        }, 900);
+        // decode token payload to decide redirect based on role
+        try {
+          const parts = data.token.split('.');
+          if (parts && parts.length > 1) {
+            const payload = JSON.parse(atob(parts[1]));
+            const role = payload.role || 'player';
+            setTimeout(() => {
+              if (role === 'master' || role === 'admin') router.push('/master/pdj');
+              else router.push('/dashboard');
+            }, 600);
+          } else {
+            setTimeout(() => { router.push('/dashboard'); }, 600);
+          }
+        } catch (e) {
+          // fallback to dashboard
+          setTimeout(() => { router.push('/dashboard'); }, 600);
+        }
       } else {
         pushLog('> resposta inesperada do servidor');
         setLoading(false);

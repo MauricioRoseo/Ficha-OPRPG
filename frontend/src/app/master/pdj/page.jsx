@@ -67,7 +67,7 @@ export default function PDJPage() {
             <div key={ch.id} className="p-3 border border-white/10 rounded flex items-center justify-between">
               <div>
                 <div className="font-semibold">{ch.name}</div>
-                <div className="text-xs text-gray-400">Jogador: {ch.user_id}</div>
+                  <div className="text-xs text-gray-400">Jogador: {ch.user_name || ch.user_email || ch.user_id}</div>
               </div>
               <div className="flex gap-2">
                 <Link href={`/character/${ch.id}`} className="px-2 py-1 border rounded text-sm">Visualizar</Link>

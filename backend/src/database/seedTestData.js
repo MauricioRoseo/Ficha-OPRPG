@@ -86,8 +86,9 @@ const seed = async () => {
     const u3 = await createUser('Carlos Ramos', 'carlos@example.com');
     const u4 = await createUser('Mariana Costa', 'mariana@example.com');
 
-  // create master / admin user for campaign master (login: testeadmin, senha: 1234)
-  const master = await createUser('Mestre Teste', 'testeadmin', '1234', 'master');
+    // create system administrator / campaign master (login: testeadmin, senha: 1234)
+    // role set to 'admin' so this account has full permissions in the system
+    const master = await createUser('Mestre Teste', 'testeadmin', '1234', 'admin');
 
     // ensure characters table has the newer columns expected by seed scripts
     try {

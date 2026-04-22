@@ -64,7 +64,9 @@ const CharacterModel = {
   },
 
   findAll: (callback) => {
-    db.query('SELECT * FROM characters', callback);
+    // include owner user name for admin/master views
+    const sql = `SELECT c.*, u.name AS user_name, u.email AS user_email FROM characters c LEFT JOIN users u ON c.user_id = u.id`;
+    db.query(sql, callback);
   },
 
   findByUserId: (userId, callback) => {
@@ -73,7 +75,8 @@ const CharacterModel = {
   },
 
   findById: (id, callback) => {
-  const sql = `SELECT * FROM characters WHERE id = ?`;
+  // include owner info (name/email) so controllers can return real owner to frontend
+  const sql = `SELECT c.*, u.name AS user_name, u.email AS user_email FROM characters c LEFT JOIN users u ON c.user_id = u.id WHERE c.id = ?`;
   db.query(sql, [id], (err, results) => {
     if (err) return callback(err);
 
@@ -128,12 +131,7 @@ CharacterModel.update = (id, data, callback) => {
     if (err) {
       console.error('[DEBUG] CharacterModel.update SQL error', err, { sql: sql.trim(), values });
     } else {
-      // find index of patrimonio value in values if present
-      let patrimonioVal = '<unchanged>';
-      if (Object.prototype.hasOwnProperty.call(data, 'patrimonio')) {
-        patrimonioVal = data.patrimonio;
-      }
-      try { console.log('[DEBUG] CharacterModel.update success', { id, patrimonio: patrimonioVal }); } catch(e){}
+      // update succeeded (debug log removed to avoid noisy output)
     }
     callback(err, result);
   });

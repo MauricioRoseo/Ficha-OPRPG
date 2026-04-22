@@ -83,7 +83,7 @@ export default function CharacterCard({ character, onClick, compact = false, cur
             </div>
             <div>
               <p className="text-gray-400 text-xs">Jogador</p>
-              <p>{currentUserName || c.user_name || '-'}</p>
+              <p>{c.user_name || currentUserName || c.user_email || '-'}</p>
             </div>
             <div className="col-span-2">
               <p className="text-gray-400 text-xs">Afinidade</p>

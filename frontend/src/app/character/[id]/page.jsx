@@ -32,6 +32,8 @@ export default function CharacterPage() {
   const [activeTab, setActiveTab] = useState('ficha');
   const [status, setStatus] = useState("");
   const [currentUserName, setCurrentUserName] = useState("");
+  const [currentUserId, setCurrentUserId] = useState(null);
+  const [currentUserRole, setCurrentUserRole] = useState('player');
   const [notes, setNotes] = useState([]);
   const [editingNote, setEditingNote] = useState(null);
   const [noteTitle, setNoteTitle] = useState("");
@@ -47,12 +49,14 @@ export default function CharacterPage() {
       return;
     }
 
-    // set current logged user name from token for 'Jogador' field
+    // set current logged user info from token for 'Jogador' field fallback
     try {
       const parts = token.split('.');
       if (parts.length >= 2) {
         const payload = JSON.parse(atob(parts[1]));
         setCurrentUserName(payload.name || payload.email || "");
+        setCurrentUserId(payload.id || null);
+        setCurrentUserRole(payload.role || payload.roles || 'player');
       }
     } catch (e) {
       // ignore
@@ -221,13 +225,13 @@ export default function CharacterPage() {
         <div className="flex items-center justify-between py-4 px-6">
           <div>
             <h2 className="text-lg font-bold">{character.name}</h2>
-            <p className="text-xs text-gray-400">Jogador: {currentUserName || character.user_name || "-"}</p>
+            <p className="text-xs text-gray-400">Jogador: {character.user_name || (character.user_id && character.user_id === currentUserId ? currentUserName : (character.user_email || '-'))}</p>
           </div>
 
           <div>
             <div className="flex gap-2">
               <button
-                onClick={() => router.push("/dashboard")}
+                onClick={() => router.push(currentUserRole === 'master' || currentUserRole === 'admin' ? '/master/pdj' : '/dashboard')}
                 className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
               >
                 Voltar
@@ -321,7 +325,7 @@ export default function CharacterPage() {
 
                       <div className="col-span-2">
                         <p className="text-gray-400 text-xs">Jogador</p>
-                        <p>{currentUserName || character.user_name || "-"}</p>
+                        <p>{character.user_name || (character.user_id && character.user_id === currentUserId ? currentUserName : (character.user_email || '-'))}</p>
                       </div>
                 </div>
               </div>
