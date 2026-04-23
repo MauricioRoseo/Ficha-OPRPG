@@ -31,6 +31,31 @@ const RitualController = {
       res.json(ritual);
     });
   }
+  ,
+
+  update: (req, res) => {
+    const role = req.user && req.user.role;
+    if (!(role === 'master' || role === 'admin')) return res.status(403).json({ message: 'Acesso negado' });
+    const id = req.params.id;
+    const data = req.body || {};
+    RitualModel.update(id, data, (err, result) => {
+      if (err) return res.status(500).json(err);
+      RitualModel.findById(id, (err2, updated) => {
+        if (err2) return res.status(500).json(err2);
+        res.json({ ritual: updated });
+      });
+    });
+  },
+
+  remove: (req, res) => {
+    const role = req.user && req.user.role;
+    if (!(role === 'master' || role === 'admin')) return res.status(403).json({ message: 'Acesso negado' });
+    const id = req.params.id;
+    RitualModel.remove(id, (err, result) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: 'Ritual removido' });
+    });
+  }
 };
 
 module.exports = RitualController;

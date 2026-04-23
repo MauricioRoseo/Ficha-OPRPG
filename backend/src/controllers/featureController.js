@@ -21,6 +21,23 @@ const FeatureController = {
     });
   },
 
+  update: (req, res) => {
+    const id = req.params.id;
+    const payload = req.body || {};
+    FeatureService.updateFeature(id, payload, (err, result) => {
+      if (err) return res.status(500).json({ message: err.message || 'Erro ao atualizar feature' });
+      res.json({ message: 'Feature atualizada' });
+    });
+  },
+
+  remove: (req, res) => {
+    const id = req.params.id;
+    FeatureService.removeFeature(id, (err, result) => {
+      if (err) return res.status(500).json({ message: err.message || 'Erro ao remover feature' });
+      res.json({ message: 'Feature removida' });
+    });
+  },
+
   search: (req, res) => {
     const q = req.query.q || '';
     const type = req.query.type || null;

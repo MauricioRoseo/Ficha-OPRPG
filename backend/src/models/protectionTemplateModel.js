@@ -34,6 +34,26 @@ const ProtectionTemplateModel = {
 
     db.query(sql, values, callback);
   }
+  ,
+  update: (id, data, callback) => {
+    const sql = `
+      UPDATE protection_templates SET name = ?, description = ?, passive_defense = ?, damage_resistance = ?, encumbrance_penalty = ?, default_equipped = ?, metadata = ? WHERE id = ?
+    `;
+    const values = [
+      data.name,
+      data.description || null,
+      data.passive_defense || 0,
+      data.damage_resistance || 0,
+      data.encumbrance_penalty || 0,
+      data.default_equipped ? 1 : 0,
+      data.metadata ? JSON.stringify(data.metadata) : null,
+      id
+    ];
+    db.query(sql, values, callback);
+  },
+  remove: (id, callback) => {
+    db.query('DELETE FROM protection_templates WHERE id = ?', [id], callback);
+  }
 };
 
 module.exports = ProtectionTemplateModel;

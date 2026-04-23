@@ -17,6 +17,8 @@ const itemsRoutes = require('./routes/itemsRoutes');
 const ritualRoutes = require('./routes/ritualRoutes');
 const characterRitualRoutes = require('./routes/characterRitualRoutes');
 const templateRoutes = require('./routes/templateRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const userRoutes = require('./routes/userRoutes');
 
 app.use(cors());
 app.use(express.json());
@@ -33,6 +35,8 @@ app.use('/', itemsRoutes);
 app.use('/rituals', ritualRoutes);
 app.use('/', characterRitualRoutes);
 app.use('/templates', templateRoutes);
+app.use('/users', userRoutes);
+app.use('/admin', adminRoutes);
 
 app.get('/', (req, res) => {
   res.send('API Ficha OPRPG funcionando 🚀');

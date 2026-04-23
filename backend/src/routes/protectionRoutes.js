@@ -9,6 +9,10 @@ const ProtectionTemplateController = require('../controllers/protectionTemplateC
 router.get('/templates', authMiddleware, ProtectionTemplateController.list);
 // create template
 router.post('/templates', authMiddleware, ProtectionTemplateController.create);
+// update template
+router.put('/templates/:id', authMiddleware, ProtectionTemplateController.update);
+// delete template
+router.delete('/templates/:id', authMiddleware, ProtectionTemplateController.remove);
 
 // create per-character protection from template
 router.post('/from-template', authMiddleware, ProtectionController.createFromTemplate);

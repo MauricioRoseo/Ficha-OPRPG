@@ -3,9 +3,14 @@ const router = express.Router();
 
 const RitualController = require('../controllers/ritualController');
 
-router.post('/', RitualController.create);
-router.get('/', RitualController.findAll);
-router.get('/search', RitualController.search);
-router.get('/:id', RitualController.getById);
+const authMiddleware = require('../middlewares/authMiddleware');
+
+router.post('/', authMiddleware, RitualController.create);
+router.get('/', authMiddleware, RitualController.findAll);
+router.get('/search', authMiddleware, RitualController.search);
+router.get('/:id', authMiddleware, RitualController.getById);
+// admin update/delete
+router.put('/:id', authMiddleware, RitualController.update);
+router.delete('/:id', authMiddleware, RitualController.remove);
 
 module.exports = router;

@@ -434,6 +434,23 @@ CREATE TABLE IF NOT EXISTS trails (
     FOREIGN KEY (class_id) REFERENCES classes(id) ON DELETE CASCADE
 );
 
+-- Extend trails to include class-granted abilities at specific levels
+-- ability_lvl_2_id: feature granted at level 2
+-- ability_lvl_8_id: feature granted at level 8
+-- ability_lvl_13_id: feature granted at level 13
+-- ability_lvl_20_id: feature granted at level 20
+ALTER TABLE trails
+    ADD COLUMN ability_lvl_2_id INT DEFAULT NULL,
+    ADD COLUMN ability_lvl_8_id INT DEFAULT NULL,
+    ADD COLUMN ability_lvl_13_id INT DEFAULT NULL,
+    ADD COLUMN ability_lvl_20_id INT DEFAULT NULL;
+
+ALTER TABLE trails
+    ADD CONSTRAINT trails_fk_ability_lvl_2 FOREIGN KEY (ability_lvl_2_id) REFERENCES features(id) ON DELETE SET NULL,
+    ADD CONSTRAINT trails_fk_ability_lvl_8 FOREIGN KEY (ability_lvl_8_id) REFERENCES features(id) ON DELETE SET NULL,
+    ADD CONSTRAINT trails_fk_ability_lvl_13 FOREIGN KEY (ability_lvl_13_id) REFERENCES features(id) ON DELETE SET NULL,
+    ADD CONSTRAINT trails_fk_ability_lvl_20 FOREIGN KEY (ability_lvl_20_id) REFERENCES features(id) ON DELETE SET NULL;
+
 -- Class trained skills (links classes to skill features)
 CREATE TABLE IF NOT EXISTS class_trained_skills (
     id INT AUTO_INCREMENT PRIMARY KEY,

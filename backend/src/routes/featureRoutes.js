@@ -8,6 +8,10 @@ router.post('/', FeatureController.create);
 router.get('/', FeatureController.findAll);
 router.get('/search', FeatureController.search);
 
+// admin: update or remove a feature template
+router.put('/:id', authMiddleware, FeatureController.update);
+router.delete('/:id', authMiddleware, FeatureController.remove);
+
 // vincular feature ao personagem
 router.post('/:characterId/:featureId', authMiddleware, FeatureController.addToCharacter);
 

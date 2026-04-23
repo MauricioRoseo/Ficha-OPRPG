@@ -24,6 +24,32 @@ const UserModel = {
     });
   }
 
+  , findAll: (callback) => {
+    const sql = `SELECT id, name, email, role, created_at FROM users ORDER BY id DESC`;
+    db.query(sql, callback);
+  }
+
+  , update: (id, payload, callback) => {
+    const fields = [];
+    const values = [];
+    if (payload.name !== undefined) { fields.push('name = ?'); values.push(payload.name); }
+    if (payload.email !== undefined) { fields.push('email = ?'); values.push(payload.email); }
+    if (fields.length === 0) return callback(null, { affectedRows: 0 });
+    const sql = `UPDATE users SET ${fields.join(', ')} WHERE id = ?`;
+    values.push(id);
+    db.query(sql, values, callback);
+  }
+
+  , updatePassword: (id, hashedPassword, callback) => {
+    const sql = `UPDATE users SET password = ? WHERE id = ?`;
+    db.query(sql, [hashedPassword, id], callback);
+  }
+
+  , remove: (id, callback) => {
+    const sql = `DELETE FROM users WHERE id = ?`;
+    db.query(sql, [id], callback);
+  }
+
 };
 
 module.exports = UserModel;

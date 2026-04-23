@@ -47,6 +47,34 @@ const RitualModel = {
       callback(null, results[0]);
     });
   }
+  ,
+  update: (id, data, callback) => {
+    const sql = `UPDATE rituals_catalog SET name = ?, circle = ?, element = ?, description = ?, effect = ?, execution = ?, alcance = ?, duration = ?, resistencia_pericia_id = ?, aprimoramento_discente = ?, custo_aprimoramento_discente = ?, descricao_aprimoramento_discente = ?, aprimoramento_verdadeiro = ?, custo_aprimoramento_verdadeiro = ?, descricao_aprimoramento_verdadeiro = ?, symbol_image = ?, symbol_image_secondary = ? WHERE id = ?`;
+    const values = [
+      data.name,
+      data.circle || null,
+      data.element || null,
+      data.description || null,
+      data.effect || null,
+      data.execution || null,
+      data.alcance || null,
+      data.duration || null,
+      data.resistencia_pericia_id || null,
+      data.aprimoramento_discente ? 1 : 0,
+      data.custo_aprimoramento_discente || null,
+      data.descricao_aprimoramento_discente || null,
+      data.aprimoramento_verdadeiro ? 1 : 0,
+      data.custo_aprimoramento_verdadeiro || null,
+      data.descricao_aprimoramento_verdadeiro || null,
+      data.symbol_image || null,
+      data.symbol_image_secondary || null,
+      id
+    ];
+    db.query(sql, values, callback);
+  },
+  remove: (id, callback) => {
+    db.query('DELETE FROM rituals_catalog WHERE id = ?', [id], callback);
+  }
 };
 
 module.exports = RitualModel;

@@ -22,6 +22,31 @@ const ProtectionTemplateController = {
       });
     });
   }
+  ,
+
+  update: (req, res) => {
+    const role = req.user && req.user.role;
+    if (!(role === 'master' || role === 'admin')) return res.status(403).json({ message: 'Acesso negado' });
+    const id = req.params.id;
+    const data = req.body || {};
+    ProtectionTemplateModel.update(id, data, (err, result) => {
+      if (err) return res.status(500).json(err);
+      ProtectionTemplateModel.findById(id, (err2, updated) => {
+        if (err2) return res.status(500).json(err2);
+        res.json({ template: updated });
+      });
+    });
+  },
+
+  remove: (req, res) => {
+    const role = req.user && req.user.role;
+    if (!(role === 'master' || role === 'admin')) return res.status(403).json({ message: 'Acesso negado' });
+    const id = req.params.id;
+    ProtectionTemplateModel.remove(id, (err, result) => {
+      if (err) return res.status(500).json(err);
+      res.json({ message: 'Proteção removida' });
+    });
+  }
 };
 
 module.exports = ProtectionTemplateController;

@@ -50,6 +50,28 @@ const FeatureModel = {
     });
   },
 
+  update: (id, data, callback) => {
+    const sql = `
+      UPDATE features SET name = ?, type = ?, description = ?, origin = ?, metadata = ?, has_encumbrance_penalty = ?, encumbrance_penalty = ?
+      WHERE id = ?
+    `;
+    const values = [
+      data.name,
+      data.type,
+      data.description || null,
+      data.origin || null,
+      data.metadata ? JSON.stringify(data.metadata) : JSON.stringify({}),
+      data.has_encumbrance_penalty ? 1 : 0,
+      (data.has_encumbrance_penalty ? (data.encumbrance_penalty || 0) : null),
+      id
+    ];
+    db.query(sql, values, callback);
+  },
+
+  remove: (id, callback) => {
+    db.query('DELETE FROM features WHERE id = ?', [id], callback);
+  },
+
   // Adds a feature to a character. Supports snapshotting template data into the row
   addToCharacter: (characterId, featureId, data, callback) => {
     const sql = `

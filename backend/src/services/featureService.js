@@ -115,6 +115,14 @@ const FeatureService = {
 
   ,
 
+  updateFeature: (id, data, callback) => {
+    FeatureModel.update(id, data, callback);
+  },
+
+  removeFeature: (id, callback) => {
+    FeatureModel.remove(id, callback);
+  },
+
   updateCharacterFeature: (characterId, charFeatureId, data, userId, callback) => {
     const CharacterModel = require('../models/characterModel');
     // verify ownership

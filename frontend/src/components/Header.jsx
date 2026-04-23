@@ -67,10 +67,11 @@ export default function Header() {
           <h1 className="logo-special text-2xl tracking-wider">FICHA OPRPG</h1>
           <p className="text-red-500 text-sm">ARQUIVOS CONFIDENCIAIS</p>
 
-          {/* show master/admin navigation link */}
+          {/* show master/admin navigation links */}
           {(role === 'master' || role === 'admin') && (
-            <nav className="ml-6">
-              <Link href="/master/pdj" className="text-sm underline">PDJ (Personagens de Jogador)</Link>
+            <nav className="ml-6 flex items-center gap-2">
+              <Link href="/master/pdj" className="text-sm px-2 py-1 border border-white/10 rounded hover:bg-white/5">PDJ</Link>
+              <Link href="/master/db" className="text-sm px-2 py-1 border border-white/10 rounded bg-yellow-600/10 hover:bg-yellow-600/20">Painel DB</Link>
             </nav>
           )}
         </div>
