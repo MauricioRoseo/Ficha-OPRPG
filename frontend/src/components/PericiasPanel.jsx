@@ -146,12 +146,16 @@ export default function PericiasPanel({ character, attributes, editable = false 
                 };
                 try {
                   const res = await fetch(`http://localhost:3001/features/character/${character.id}/${editingPericia.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
-                  if (!res.ok) throw new Error('Erro ao atualizar perícia');
+                  if (!res.ok) {
+                    let msg = 'Erro ao atualizar perícia';
+                    try{ const body = await res.json(); if (body && body.message) msg = body.message; }catch(e){}
+                    throw new Error(msg);
+                  }
                   await fetchCharacterPericias();
                   setShowEdit(false);
                   setEditingPericia(null);
                 } catch (err) {
-                  alert('Erro ao atualizar perícia'); console.error(err);
+                  alert(err.message || 'Erro ao atualizar perícia'); console.error(err);
                 }
               }} className="space-y-3">
                 <div>
@@ -160,7 +164,7 @@ export default function PericiasPanel({ character, attributes, editable = false 
                     <option value="none">Nenhum</option>
                     <option value="trained">Treinado</option>
                     <option value="veteran">Veterano</option>
-                    <option value="expert">Especialista</option>
+                    <option value="expert">Expert</option>
                   </select>
                 </div>
                 <div className="grid grid-cols-2 gap-2">

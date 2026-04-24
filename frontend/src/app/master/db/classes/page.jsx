@@ -24,12 +24,13 @@ function Modal({ open, onClose, title, children }){
 export default function ClassesAdminPage(){
   const router = useRouter();
   const [items, setItems] = useState([]);
+  const [abilities, setAbilities] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [creatingOpen, setCreatingOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', description: '', hp_initial: 0, hp_per_level: 0, effort_initial: 0, effort_per_level: 0, sanity_initial: 0, sanity_per_level: 0, choice_skills_count: 0, proficiencies: '', metadata: '' });
+  const [form, setForm] = useState({ name: '', description: '', hp_initial: 0, hp_per_level: 0, effort_initial: 0, effort_per_level: 0, sanity_initial: 0, sanity_per_level: 0, choice_skills_count: 0, proficiencies: '', metadata: '', primary_ability_id: null, secondary_ability_id: null, training_level: null });
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
@@ -37,7 +38,19 @@ export default function ClassesAdminPage(){
   useEffect(()=>{
     if(!token){ router.push('/'); return; }
     fetchList();
+    fetchAbilities();
   }, []);
+
+  const fetchAbilities = async ()=>{
+    try{
+      const res = await fetch('http://localhost:3001/features', { headers: { Authorization: `Bearer ${token}` } });
+      if(!res.ok) throw new Error('Erro ao buscar features');
+      const data = await res.json();
+      // filter only features of type 'habilidade'
+      const hab = (data || []).filter(f => f.type === 'habilidade');
+      setAbilities(hab);
+    }catch(e){ console.error('Erro ao carregar habilidades:', e); }
+  };
 
   const fetchList = async ()=>{
     setLoading(true);
@@ -57,6 +70,9 @@ export default function ClassesAdminPage(){
     setForm({
       name: it.name || '',
       description: it.description || '',
+      primary_ability_id: it.primary_ability_id || null,
+      secondary_ability_id: it.secondary_ability_id || null,
+      training_level: typeof it.training_level !== 'undefined' && it.training_level !== null ? it.training_level : null,
       hp_initial: it.hp_initial || 0,
       hp_per_level: it.hp_per_level || 0,
       effort_initial: it.effort_initial || 0,
@@ -84,7 +100,7 @@ export default function ClassesAdminPage(){
 
   const handleCreateOpen = ()=>{
     setCreatingOpen(true);
-    setForm({ name: '', description: '', hp_initial: 0, hp_per_level: 0, effort_initial: 0, effort_per_level: 0, sanity_initial: 0, sanity_per_level: 0, choice_skills_count: 0, proficiencies: '', metadata: '' });
+    setForm({ name: '', description: '', hp_initial: 0, hp_per_level: 0, effort_initial: 0, effort_per_level: 0, sanity_initial: 0, sanity_per_level: 0, choice_skills_count: 0, proficiencies: '', metadata: '', primary_ability_id: null, secondary_ability_id: null, training_level: null });
   };
 
   const handleCreate = async ()=>{
@@ -160,6 +176,9 @@ export default function ClassesAdminPage(){
             <div><span className="text-gray-400">Escolhas de perícias: </span>{selected.choice_skills_count || 0}</div>
             <div><span className="text-gray-400">Proficiencias: </span><div className="mt-1 text-gray-200">{selected.proficiencies ? (typeof selected.proficiencies === 'string' ? selected.proficiencies : JSON.stringify(selected.proficiencies)) : '—'}</div></div>
             <div><span className="text-gray-400">Metadata: </span><div className="mt-1 text-gray-200">{selected.metadata ? (typeof selected.metadata === 'string' ? selected.metadata : JSON.stringify(selected.metadata)) : '—'}</div></div>
+            <div><span className="text-gray-400">Habilidade Primária: </span><span className="ml-2">{(abilities.find(a=>a.id===selected.primary_ability_id) || {}).name || '—'}</span></div>
+            <div><span className="text-gray-400">Habilidade Secundária: </span><span className="ml-2">{(abilities.find(a=>a.id===selected.secondary_ability_id) || {}).name || '—'}</span></div>
+            <div><span className="text-gray-400">Grau de Treinamento: </span><span className="ml-2">{selected.training_level ?? '—'}</span></div>
             <div className="flex gap-2">
               <button onClick={startEdit} className="px-3 py-1 bg-blue-600/80 rounded">Editar</button>
               <button onClick={()=>handleDelete(selected.id)} className="px-3 py-1 bg-red-600/60 rounded">Remover</button>
@@ -171,6 +190,26 @@ export default function ClassesAdminPage(){
           <div className="space-y-2">
             <input placeholder="Nome" value={form.name} onChange={e=>setForm(f=>({...f, name: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
             <textarea placeholder="Descrição" value={form.description} onChange={e=>setForm(f=>({...f, description: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="text-xs text-gray-400">Habilidade Primária</label>
+                <select value={form.primary_ability_id ?? ''} onChange={e=>setForm(f=>({...f, primary_ability_id: e.target.value ? Number(e.target.value) : null}))} className="w-full p-2 rounded bg-[#021018] border border-white/6">
+                  <option value="">—</option>
+                  {abilities.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="text-xs text-gray-400">Habilidade Secundária (opcional)</label>
+                <select value={form.secondary_ability_id ?? ''} onChange={e=>setForm(f=>({...f, secondary_ability_id: e.target.value ? Number(e.target.value) : null}))} className="w-full p-2 rounded bg-[#021018] border border-white/6">
+                  <option value="">—</option>
+                  {abilities.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-gray-400">Grau de Treinamento</label>
+              <input type="number" placeholder="Grau de treinamento" value={form.training_level ?? ''} onChange={e=>setForm(f=>({...f, training_level: e.target.value !== '' ? Number(e.target.value) : null}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
+            </div>
             <div className="grid grid-cols-2 gap-2">
               <input type="number" placeholder="HP inicial" value={form.hp_initial} onChange={e=>setForm(f=>({...f, hp_initial: Number(e.target.value)}))} className="p-2 rounded bg-[#021018] border border-white/6" />
               <input type="number" placeholder="HP por nível" value={form.hp_per_level} onChange={e=>setForm(f=>({...f, hp_per_level: Number(e.target.value)}))} className="p-2 rounded bg-[#021018] border border-white/6" />
@@ -185,6 +224,7 @@ export default function ClassesAdminPage(){
             <div className="flex gap-2">
               <button onClick={handleSaveEdit} className="px-3 py-1 bg-green-600/80 rounded">Salvar</button>
               <button onClick={()=>{ setEditing(false); setForm({ name: selected.name || '', description: selected.description || '', hp_initial: selected.hp_initial || 0, hp_per_level: selected.hp_per_level || 0, effort_initial: selected.effort_initial || 0, effort_per_level: selected.effort_per_level || 0, sanity_initial: selected.sanity_initial || 0, sanity_per_level: selected.sanity_per_level || 0, choice_skills_count: selected.choice_skills_count || 0, proficiencies: selected.proficiencies ? (typeof selected.proficiencies === 'string' ? selected.proficiencies : JSON.stringify(selected.proficiencies)) : '', metadata: selected.metadata ? (typeof selected.metadata === 'string' ? selected.metadata : JSON.stringify(selected.metadata)) : '' }); }} className="px-3 py-1 border rounded">Cancelar</button>
+              <button onClick={()=>{ setEditing(false); setForm({ name: selected.name || '', description: selected.description || '', primary_ability_id: selected.primary_ability_id || null, secondary_ability_id: selected.secondary_ability_id || null, training_level: typeof selected.training_level !== 'undefined' && selected.training_level !== null ? selected.training_level : null, hp_initial: selected.hp_initial || 0, hp_per_level: selected.hp_per_level || 0, effort_initial: selected.effort_initial || 0, effort_per_level: selected.effort_per_level || 0, sanity_initial: selected.sanity_initial || 0, sanity_per_level: selected.sanity_per_level || 0, choice_skills_count: selected.choice_skills_count || 0, proficiencies: selected.proficiencies ? (typeof selected.proficiencies === 'string' ? selected.proficiencies : JSON.stringify(selected.proficiencies)) : '', metadata: selected.metadata ? (typeof selected.metadata === 'string' ? selected.metadata : JSON.stringify(selected.metadata)) : '' }); }} className="px-3 py-1 border rounded">Cancelar</button>
             </div>
           </div>
         )}
@@ -195,6 +235,26 @@ export default function ClassesAdminPage(){
         <div className="space-y-2">
           <input placeholder="Nome" value={form.name} onChange={e=>setForm(f=>({...f, name: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
           <textarea placeholder="Descrição" value={form.description} onChange={e=>setForm(f=>({...f, description: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className="text-xs text-gray-400">Habilidade Primária</label>
+              <select value={form.primary_ability_id ?? ''} onChange={e=>setForm(f=>({...f, primary_ability_id: e.target.value ? Number(e.target.value) : null}))} className="w-full p-2 rounded bg-[#021018] border border-white/6">
+                <option value="">—</option>
+                {abilities.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-gray-400">Habilidade Secundária (opcional)</label>
+              <select value={form.secondary_ability_id ?? ''} onChange={e=>setForm(f=>({...f, secondary_ability_id: e.target.value ? Number(e.target.value) : null}))} className="w-full p-2 rounded bg-[#021018] border border-white/6">
+                <option value="">—</option>
+                {abilities.map(a=> <option key={a.id} value={a.id}>{a.name}</option>)}
+              </select>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400">Grau de Treinamento</label>
+            <input type="number" placeholder="Grau de treinamento" value={form.training_level ?? ''} onChange={e=>setForm(f=>({...f, training_level: e.target.value !== '' ? Number(e.target.value) : null}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
+          </div>
           <div className="grid grid-cols-2 gap-2">
             <input type="number" placeholder="HP inicial" value={form.hp_initial} onChange={e=>setForm(f=>({...f, hp_initial: Number(e.target.value)}))} className="p-2 rounded bg-[#021018] border border-white/6" />
             <input type="number" placeholder="HP por nível" value={form.hp_per_level} onChange={e=>setForm(f=>({...f, hp_per_level: Number(e.target.value)}))} className="p-2 rounded bg-[#021018] border border-white/6" />

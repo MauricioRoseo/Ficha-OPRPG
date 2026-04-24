@@ -42,20 +42,42 @@ export default function PericiaTemplatesModal({ isOpen, onClose, onUse }) {
         ) : (
           <div className="space-y-2 max-h-72 overflow-auto">
             {templates.map(t => (
-              <div key={t.id} className="p-3 border border-white/6 rounded flex items-center justify-between">
-                <div>
-                  <div className="font-semibold">{t.name}</div>
-                  <div className="text-sm text-gray-400">{t.description}</div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <div className="text-sm">Atributo: {t.metadata?.atributo || '-'}</div>
-                  <button onClick={() => onUse && onUse(t)} className="px-2 py-1 bg-white/6 rounded text-sm">Usar</button>
-                </div>
-              </div>
+              <TemplateRow key={t.id} t={t} onUse={onUse} />
             ))}
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+function TemplateRow({ t, onUse }){
+  const [showDesc, setShowDesc] = React.useState(false);
+
+  return (
+    <div className="p-3 border border-white/6 rounded flex items-center justify-between">
+      <div className="flex items-center gap-3">
+        <div className="font-semibold">{t.name}</div>
+        <button title="Descrição" onClick={() => setShowDesc(true)} className="text-gray-400 hover:text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 inline" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M12 2a10 10 0 100 20 10 10 0 000-20z"/></svg>
+        </button>
+      </div>
+      <div className="flex flex-col items-end gap-2">
+        <div className="text-sm">Atributo: {t.metadata?.atributo || '-'}</div>
+        <button onClick={() => onUse && onUse(t)} className="px-2 py-1 bg-white/6 rounded text-sm">Usar</button>
+      </div>
+
+      {showDesc ? (
+        <div className="modal-overlay fixed inset-0 z-60 flex items-center justify-center">
+          <div className="modal-card bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-lg">
+            <h3 className="text-lg font-bold mb-2">Descrição</h3>
+            <div className="text-sm mb-4">{t.description || 'Sem descrição.'}</div>
+            <div className="flex justify-end">
+              <button onClick={() => setShowDesc(false)} className="px-3 py-1 border border-white/10 rounded">Fechar</button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

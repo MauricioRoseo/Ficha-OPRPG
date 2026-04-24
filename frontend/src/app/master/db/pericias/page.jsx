@@ -149,7 +149,7 @@ export default function PericiasAdminPage(){
               {!isEditing ? (
                   <div className="mt-4 space-y-2 text-sm">
                   <div><span className="text-gray-400">Nome: </span>{selected.name}</div>
-                  <div><span className="text-gray-400">Descrição: </span><div className="mt-1 text-gray-200">{selected.description || '—'}</div></div>
+                  <div><span className="text-gray-400">Descrição: </span><div className="mt-1 text-gray-200" style={{whiteSpace: 'pre-wrap'}}>{selected.description || '—'}</div></div>
                   <div><span className="text-gray-400">Penalidade de carga: </span>{selected.has_encumbrance_penalty ? selected.encumbrance_penalty || 'Sim' : 'Não'}</div>
                   <div><span className="text-gray-400">Metadata: </span><pre className="text-xs mt-1 bg-[#021018] p-2 rounded text-gray-200">{JSON.stringify(selected.metadata || {}, null, 2)}</pre></div>
                 </div>

@@ -405,6 +405,29 @@ CREATE TABLE IF NOT EXISTS character_backgrounds (
 
     FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
 );
+    -- Layouts for master to arrange character cards on public screens
+    CREATE TABLE IF NOT EXISTS layouts (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        slug VARCHAR(255) NOT NULL UNIQUE,
+        description TEXT DEFAULT NULL,
+        is_public TINYINT(1) DEFAULT 0,
+        created_by INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        CONSTRAINT fk_layouts_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS layout_characters (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        layout_id INT NOT NULL,
+        character_id INT NOT NULL,
+        position_index INT DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        CONSTRAINT fk_layoutchar_layout FOREIGN KEY (layout_id) REFERENCES layouts(id) ON DELETE CASCADE,
+        CONSTRAINT fk_layoutchar_character FOREIGN KEY (character_id) REFERENCES characters(id) ON DELETE CASCADE
+    );
+
 
 -- ------------------------------------------------------------------
 -- Class / Trilha / Origem templates
@@ -424,6 +447,21 @@ CREATE TABLE IF NOT EXISTS classes (
     metadata JSON DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Add fields to allow a class to have a primary and optional secondary ability
+-- plus a numeric training level value stored per class.
+ALTER TABLE classes
+    ADD COLUMN primary_ability_id INT DEFAULT NULL,
+    ADD COLUMN secondary_ability_id INT DEFAULT NULL,
+    ADD COLUMN training_level INT DEFAULT NULL;
+
+ALTER TABLE classes
+    ADD KEY (primary_ability_id),
+    ADD KEY (secondary_ability_id);
+
+ALTER TABLE classes
+    ADD CONSTRAINT classes_fk_primary_ability FOREIGN KEY (primary_ability_id) REFERENCES features(id) ON DELETE SET NULL,
+    ADD CONSTRAINT classes_fk_secondary_ability FOREIGN KEY (secondary_ability_id) REFERENCES features(id) ON DELETE SET NULL;
 
 CREATE TABLE IF NOT EXISTS trails (
     id INT AUTO_INCREMENT PRIMARY KEY,

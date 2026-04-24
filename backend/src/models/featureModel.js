@@ -1,5 +1,34 @@
 const db = require('../config/database');
 
+// helper: try to parse JSON safely, including double-encoded JSON strings
+function safeParseJson(v){
+  if (v === undefined || v === null) return null;
+  if (typeof v !== 'string') return v;
+  try{
+    const once = JSON.parse(v);
+    // if parsing returns a string (double-encoded), try parse again
+    if (typeof once === 'string'){
+      try{ return JSON.parse(once); }catch(e){ return once; }
+    }
+    return once;
+  }catch(e){
+    // not valid JSON
+    return null;
+  }
+}
+
+function normalizeMetadataInput(meta){
+  if (meta === undefined || meta === null) return {};
+  if (typeof meta === 'object') return meta;
+  if (typeof meta === 'string'){
+    const parsed = safeParseJson(meta);
+    if (parsed && typeof parsed === 'object') return parsed;
+    // fallback: empty object to keep JSON column consistent
+    return {};
+  }
+  return {};
+}
+
 const FeatureModel = {
 
   create: (data, callback) => {
@@ -11,9 +40,9 @@ const FeatureModel = {
     const values = [
       data.name,
       data.type,
-      data.description || null,
+      (data.description !== undefined ? data.description : null),
       data.origin || null,
-      JSON.stringify(data.metadata || {}),
+      JSON.stringify(normalizeMetadataInput(data.metadata)),
       data.has_encumbrance_penalty ? 1 : 0,
       (data.has_encumbrance_penalty ? (data.encumbrance_penalty || 0) : null)
     ];
@@ -42,8 +71,8 @@ const FeatureModel = {
         ...f,
         metadata:
           typeof f.metadata === "string"
-            ? JSON.parse(f.metadata)
-            : f.metadata || {}
+            ? (safeParseJson(f.metadata) || {})
+            : (f.metadata || {})
       }));
 
       callback(null, parsed);
@@ -58,7 +87,7 @@ const FeatureModel = {
     const values = [
       data.name,
       data.type,
-      data.description || null,
+      (data.description !== undefined ? data.description : null),
       data.origin || null,
       data.metadata ? JSON.stringify(data.metadata) : JSON.stringify({}),
       data.has_encumbrance_penalty ? 1 : 0,
@@ -119,8 +148,8 @@ const FeatureModel = {
       // parse metadata and prefer template_metadata (snapshot) if present
       const parsed = results.map(row => {
         // row.template_metadata may be string
-        const templateMeta = row.template_metadata ? (typeof row.template_metadata === 'string' ? JSON.parse(row.template_metadata) : row.template_metadata) : null;
-        const featureMeta = row.feature_metadata ? (typeof row.feature_metadata === 'string' ? JSON.parse(row.feature_metadata) : row.feature_metadata) : null;
+          const templateMeta = row.template_metadata ? (safeParseJson(row.template_metadata) || null) : null;
+          const featureMeta = row.feature_metadata ? (safeParseJson(row.feature_metadata) || null) : null;
 
         // Build resulting object similar to prior shape but include template snapshot fields
         return {

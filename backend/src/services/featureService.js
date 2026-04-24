@@ -37,13 +37,17 @@ const FeatureService = {
     });
   },
 
-  removeFeatureFromCharacter: (characterId, charFeatureId, userId, callback) => {
+  removeFeatureFromCharacter: (characterId, charFeatureId, user, callback) => {
     // verify character ownership then delete the character_feature row
     const CharacterModel = require('../models/characterModel');
     CharacterModel.findById(characterId, (err, character) => {
       if (err) return callback(err);
       if (!character) return callback(new Error('Personagem não encontrado'));
-      if (character.user_id !== userId) return callback(new Error('Acesso negado'));
+
+      // allow owners or users with elevated role to remove
+      const isOwner = (character.user_id === (user && user.id));
+      const isElevated = (user && (user.role === 'master' || user.role === 'admin'));
+      if (!isOwner && !isElevated) return callback(new Error('Acesso negado'));
 
       // ensure the feature belongs to this character
       FeatureModel.getByCharacter(characterId, (err2, features) => {
@@ -123,13 +127,16 @@ const FeatureService = {
     FeatureModel.remove(id, callback);
   },
 
-  updateCharacterFeature: (characterId, charFeatureId, data, userId, callback) => {
+  updateCharacterFeature: (characterId, charFeatureId, data, user, callback) => {
     const CharacterModel = require('../models/characterModel');
-    // verify ownership
+    // verify ownership (or elevated role)
     CharacterModel.findById(characterId, (err, character) => {
       if (err) return callback(err);
       if (!character) return callback(new Error('Personagem não encontrado'));
-      if (character.user_id !== userId) return callback(new Error('Acesso negado'));
+
+      const isOwner = (character.user_id === (user && user.id));
+      const isElevated = (user && (user.role === 'master' || user.role === 'admin'));
+      if (!isOwner && !isElevated) return callback(new Error('Acesso negado'));
 
       // ensure the character actually has this feature
       FeatureModel.getByCharacter(characterId, (err2, features) => {

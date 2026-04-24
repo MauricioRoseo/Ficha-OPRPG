@@ -3,6 +3,8 @@ const FeatureService = require('../services/featureService');
 const FeatureController = {
 
   create: (req, res) => {
+    // log description for debugging newline persistence
+    try{ console.debug('Feature create description:', JSON.stringify(req.body.description)); }catch(e){}
     FeatureService.createFeature(req.body, (err, result) => {
       if (err) return res.status(500).json(err);
 
@@ -24,6 +26,7 @@ const FeatureController = {
   update: (req, res) => {
     const id = req.params.id;
     const payload = req.body || {};
+    try{ console.debug('Feature update description:', JSON.stringify(payload.description)); }catch(e){}
     FeatureService.updateFeature(id, payload, (err, result) => {
       if (err) return res.status(500).json({ message: err.message || 'Erro ao atualizar feature' });
       res.json({ message: 'Feature atualizada' });
@@ -82,9 +85,9 @@ const FeatureController = {
 
   removeFromCharacter: (req, res) => {
     const { characterId, id } = req.params;
-    const userId = req.user && req.user.id;
+    const user = req.user || null; // pass whole user payload to service (contains id and role)
 
-    FeatureService.removeFeatureFromCharacter(characterId, id, userId, (err, result) => {
+    FeatureService.removeFeatureFromCharacter(characterId, id, user, (err, result) => {
       if (err) {
         if (err.message === 'Acesso negado') return res.status(403).json({ message: err.message });
         return res.status(500).json({ message: err.message || 'Erro' });
@@ -97,10 +100,10 @@ const FeatureController = {
 
   updateCharacterFeature: (req, res) => {
     const { characterId, id } = req.params;
-    const userId = req.user && req.user.id;
+    const user = req.user || null; // pass user object (id + role)
     const payload = req.body || {};
 
-    FeatureService.updateCharacterFeature(characterId, id, payload, userId, (err, result) => {
+    FeatureService.updateCharacterFeature(characterId, id, payload, user, (err, result) => {
       if (err) {
         if (err.message === 'Acesso negado') return res.status(403).json({ message: err.message });
         return res.status(500).json({ message: err.message || 'Erro' });

@@ -4,8 +4,8 @@ import { usePathname } from "next/navigation";
 
 export default function Footer() {
   const pathname = usePathname();
-  // hide footer on login page
-  if (pathname === "/") return null;
+  // hide footer on login page and on public layout views
+  if (pathname === "/" || (pathname && pathname.startsWith('/layouts/'))) return null;
 
   return (
     <footer style={{ background: 'var(--surface)', color: 'var(--foreground)' }} className="mt-6 text-center text-xs">

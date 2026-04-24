@@ -48,8 +48,8 @@ export default function Header() {
     });
   }, []);
 
-  // don't render header on the public login root page
-  if (pathname === "/") return null;
+  // don't render header on the public login root page or on public layout views
+  if (pathname === "/" || (pathname && pathname.startsWith('/layouts/'))) return null;
 
   const handleLogout = () => {
     console.debug('[Header] logout: clearing token and header state');
@@ -71,6 +71,8 @@ export default function Header() {
           {(role === 'master' || role === 'admin') && (
             <nav className="ml-6 flex items-center gap-2">
               <Link href="/master/pdj" className="text-sm px-2 py-1 border border-white/10 rounded hover:bg-white/5">PDJ</Link>
+              <Link href="/master/meus-agentes" className="text-sm px-2 py-1 border border-white/10 rounded hover:bg-white/5">Meus Agentes</Link>
+              <Link href="/master/layouts" className="text-sm px-2 py-1 border border-white/10 rounded hover:bg-white/5">Layouts</Link>
               <Link href="/master/db" className="text-sm px-2 py-1 border border-white/10 rounded bg-yellow-600/10 hover:bg-yellow-600/20">Painel DB</Link>
             </nav>
           )}
