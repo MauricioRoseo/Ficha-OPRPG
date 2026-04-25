@@ -35,10 +35,13 @@ export default function SkillsPanel({ character, editable = false }) {
 
   const searchFeatures = async (q) => {
     try {
-      const res = await fetch(`http://localhost:3001/features/search?q=${encodeURIComponent(q)}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+      // request only habilidades from the catalog
+      const res = await fetch(`http://localhost:3001/features/search?type=habilidade&q=${encodeURIComponent(q)}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });
       if (!res.ok) throw new Error('Erro ao buscar features');
       const data = await res.json();
-      setCatalogResults(data || []);
+      // extra safety: filter client-side as well
+      const filtered = (data || []).filter(f => f.type === 'habilidade');
+      setCatalogResults(filtered);
     } catch (e) { console.error(e); setCatalogResults([]); }
   };
 
@@ -80,7 +83,10 @@ export default function SkillsPanel({ character, editable = false }) {
           {skills.map(s => (
             <div key={s.id} className="p-3 bg-[#011415] border border-white/6 rounded">
               <div className="flex justify-between items-start">
-                <div onClick={() => { if (!editable) { setViewingSkill(s); setShowViewModal(true); } }} className="text-sm text-gray-300 cursor-pointer">({s.origin || s.template_name || s.metadata?.source || 'Origem desconhecida'} - {s.name}). {s.description || s.template_description || '-'}</div>
+                <div className="flex items-center gap-3">
+                  <div className="text-sm text-gray-300">({s.origin || s.template_name || s.metadata?.source || 'Origem desconhecida'} - {s.name})</div>
+                  <button onClick={() => { setViewingSkill(s); setShowViewModal(true); }} title="Ver detalhes" aria-label={`Ver detalhes de ${s.name}`} className="px-2 py-1 border border-white/10 rounded-full text-xs">i</button>
+                </div>
                 {editable ? (
                   <div className="flex gap-2">
                     <button onClick={() => { setEditingSkill(s); setShowEditModal(true); }} className="px-2 py-1 border border-white/10 rounded text-sm">Editar</button>
@@ -113,9 +119,11 @@ export default function SkillsPanel({ character, editable = false }) {
                     <div className="max-h-48 overflow-auto mb-3">
                       {catalogResults.map(c => (
                         <div key={c.id} className="p-2 border-b border-white/6 flex justify-between items-center">
-                          <div>
-                            <div className="font-semibold">{c.name}</div>
-                            <div className="text-xs text-gray-400">{c.description}</div>
+                          <div className="flex items-center gap-3">
+                            <div>
+                              <div className="font-semibold">{c.name}</div>
+                            </div>
+                            <button onClick={() => { setViewingSkill(c); setShowViewModal(true); }} title={`Ver detalhes de ${c.name}`} aria-label={`Ver detalhes de ${c.name}`} className="px-2 py-1 border border-white/10 rounded-full text-xs">i</button>
                           </div>
                           <div>
                             <button onClick={()=>handleAddFromCatalog(c)} className="px-2 py-1 border border-white/10 rounded">Adicionar</button>
