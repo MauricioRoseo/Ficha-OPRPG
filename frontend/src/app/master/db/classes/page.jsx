@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 function Modal({ open, onClose, title, children }){
   if(!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="modal-overlay fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/60" onClick={onClose}></div>
-      <div className="relative bg-[#071018] border border-white/10 rounded-lg p-6 w-full max-w-2xl z-10">
+      <div className="relative modal-card bg-[#071018] border border-white/10 rounded-lg p-6 w-full max-w-2xl z-10">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold">{title}</h3>
           <button onClick={onClose} className="px-2 py-1 border rounded text-sm">Fechar</button>
@@ -179,7 +179,7 @@ export default function ClassesAdminPage(){
             <div><span className="text-gray-400">Habilidade Primária: </span><span className="ml-2">{(abilities.find(a=>a.id===selected.primary_ability_id) || {}).name || '—'}</span></div>
             <div><span className="text-gray-400">Habilidade Secundária: </span><span className="ml-2">{(abilities.find(a=>a.id===selected.secondary_ability_id) || {}).name || '—'}</span></div>
             <div><span className="text-gray-400">Grau de Treinamento: </span><span className="ml-2">{selected.training_level ?? '—'}</span></div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 modal-sticky-footer">
               <button onClick={startEdit} className="px-3 py-1 bg-blue-600/80 rounded">Editar</button>
               <button onClick={()=>handleDelete(selected.id)} className="px-3 py-1 bg-red-600/60 rounded">Remover</button>
             </div>
@@ -221,9 +221,8 @@ export default function ClassesAdminPage(){
             <input type="number" placeholder="Escolhas de perícias" value={form.choice_skills_count} onChange={e=>setForm(f=>({...f, choice_skills_count: Number(e.target.value)}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
             <textarea placeholder="Proficiencias (JSON ou texto)" value={form.proficiencies} onChange={e=>setForm(f=>({...f, proficiencies: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
             <textarea placeholder="Metadata (JSON)" value={form.metadata} onChange={e=>setForm(f=>({...f, metadata: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
-            <div className="flex gap-2">
+            <div className="flex gap-2 modal-sticky-footer">
               <button onClick={handleSaveEdit} className="px-3 py-1 bg-green-600/80 rounded">Salvar</button>
-              <button onClick={()=>{ setEditing(false); setForm({ name: selected.name || '', description: selected.description || '', hp_initial: selected.hp_initial || 0, hp_per_level: selected.hp_per_level || 0, effort_initial: selected.effort_initial || 0, effort_per_level: selected.effort_per_level || 0, sanity_initial: selected.sanity_initial || 0, sanity_per_level: selected.sanity_per_level || 0, choice_skills_count: selected.choice_skills_count || 0, proficiencies: selected.proficiencies ? (typeof selected.proficiencies === 'string' ? selected.proficiencies : JSON.stringify(selected.proficiencies)) : '', metadata: selected.metadata ? (typeof selected.metadata === 'string' ? selected.metadata : JSON.stringify(selected.metadata)) : '' }); }} className="px-3 py-1 border rounded">Cancelar</button>
               <button onClick={()=>{ setEditing(false); setForm({ name: selected.name || '', description: selected.description || '', primary_ability_id: selected.primary_ability_id || null, secondary_ability_id: selected.secondary_ability_id || null, training_level: typeof selected.training_level !== 'undefined' && selected.training_level !== null ? selected.training_level : null, hp_initial: selected.hp_initial || 0, hp_per_level: selected.hp_per_level || 0, effort_initial: selected.effort_initial || 0, effort_per_level: selected.effort_per_level || 0, sanity_initial: selected.sanity_initial || 0, sanity_per_level: selected.sanity_per_level || 0, choice_skills_count: selected.choice_skills_count || 0, proficiencies: selected.proficiencies ? (typeof selected.proficiencies === 'string' ? selected.proficiencies : JSON.stringify(selected.proficiencies)) : '', metadata: selected.metadata ? (typeof selected.metadata === 'string' ? selected.metadata : JSON.stringify(selected.metadata)) : '' }); }} className="px-3 py-1 border rounded">Cancelar</button>
             </div>
           </div>
@@ -266,7 +265,7 @@ export default function ClassesAdminPage(){
           <input type="number" placeholder="Escolhas de perícias" value={form.choice_skills_count} onChange={e=>setForm(f=>({...f, choice_skills_count: Number(e.target.value)}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
           <textarea placeholder="Proficiencias (JSON ou texto)" value={form.proficiencies} onChange={e=>setForm(f=>({...f, proficiencies: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
           <textarea placeholder="Metadata (JSON)" value={form.metadata} onChange={e=>setForm(f=>({...f, metadata: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
-          <div className="flex gap-2">
+          <div className="flex gap-2 modal-sticky-footer">
             <button onClick={handleCreate} className="px-3 py-1 bg-green-600/80 rounded">Criar</button>
             <button onClick={()=>setCreatingOpen(false)} className="px-3 py-1 border rounded">Cancelar</button>
           </div>

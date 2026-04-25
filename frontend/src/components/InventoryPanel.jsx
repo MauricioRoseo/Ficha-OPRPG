@@ -8,9 +8,11 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
   const [showModal, setShowModal] = useState(false);
   const [catalogResults, setCatalogResults] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [form, setForm] = useState({ name: '', description: '', space: 0, category: '' });
+  const [form, setForm] = useState({ name: '', description: '', space: 0, category: '', metadataList: [] });
   const [showEditModal, setShowEditModal] = useState(false);
   const [editForm, setEditForm] = useState({ name: '', description: '', space: 0, category: '' });
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
   const [editItemId, setEditItemId] = useState(null);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [config, setConfig] = useState({ base_attribute: 'forca', extra_attribute: '', modifiers: [] });
@@ -32,7 +34,7 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
 
   const handleEditClick = (item) => {
     setEditItemId(item.id);
-    setEditForm({ name: item.name || '', description: item.description || '', space: item.space || 0, category: item.category || '' });
+    setEditForm({ name: item.name || '', description: item.description || '', space: item.space || 0, category: item.category || '', metadataList: (item.metadata && typeof item.metadata === 'object') ? Object.keys(item.metadata).map((k,idx)=>({ id: Date.now() + idx, key: k, value: String(item.metadata[k] ?? '') })) : [] });
     setShowEditModal(true);
   };
 
@@ -40,7 +42,10 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
     e && e.preventDefault && e.preventDefault();
     if (!editItemId) return;
     try {
-      const payload = { ...editForm };
+      // build metadata object from metadataList
+      const metaList = editForm.metadataList || [];
+      const metadataObj = metaList.reduce((acc,m)=>{ if (m.key && m.key.length) acc[m.key] = m.value; return acc; }, {});
+      const payload = { name: editForm.name, description: editForm.description, space: editForm.space, category: editForm.category, metadata: Object.keys(metadataObj).length ? metadataObj : null };
       const res = await fetch(`http://localhost:3001/inventory/${editItemId}`, { method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error('Erro ao atualizar item');
       const json = await res.json();
@@ -142,10 +147,12 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
   const handleCreate = async (e) => {
     e && e.preventDefault && e.preventDefault();
     try {
-      const payload = { ...form, character_id: character.id };
+      const metaList = form.metadataList || [];
+      const metadataObj = metaList.reduce((acc,m)=>{ if (m.key && m.key.length) acc[m.key] = m.value; return acc; }, {});
+      const payload = { name: form.name, description: form.description, space: form.space, category: form.category, metadata: Object.keys(metadataObj).length ? metadataObj : null, character_id: character.id };
       const res = await fetch('http://localhost:3001/inventory', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error('Erro ao criar item');
-      setForm({ name: '', description: '', space: 0, category: '' });
+      setForm({ name: '', description: '', space: 0, category: '', metadataList: [] });
       setShowAdd(false);
       setShowModal(false);
       await fetchItems();
@@ -172,7 +179,7 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
   const handleSelectCatalog = async (item) => {
     // create inventory entry based on catalog item
     try {
-      const payload = { character_id: character.id, name: item.name, description: item.description, space: item.space, category: item.category };
+      const payload = { character_id: character.id, name: item.name, description: item.description, space: item.space, category: item.category, metadata: item.metadata || null };
       const res = await fetch('http://localhost:3001/inventory', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: token ? `Bearer ${token}` : '' }, body: JSON.stringify(payload) });
       if (!res.ok) throw new Error('Erro ao adicionar item do catálogo');
       const json = await res.json();
@@ -325,6 +332,22 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
                       <option value="IV">IV</option>
                     </select>
                   </div>
+                  <div>
+                    <div className="flex justify-between items-center">
+                      <div className="text-sm text-gray-400">Metadados</div>
+                      <button type="button" onClick={()=>setForm(f=>({...f, metadataList: [...(f.metadataList||[]), { id: Date.now(), key: '', value: '' }] }))} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar</button>
+                    </div>
+                    <div className="space-y-2 mt-2">
+                      {(form.metadataList || []).map(m => (
+                        <div key={m.id} className="flex gap-2">
+                          <input placeholder="Chave" value={m.key} onChange={e=>setForm(f=>({...f, metadataList: f.metadataList.map(x=> x.id===m.id?({...x, key: e.target.value}):x) }))} className="p-2 bg-[#011415] text-white border border-white/6 rounded w-1/3" />
+                          <input placeholder="Valor" value={m.value} onChange={e=>setForm(f=>({...f, metadataList: f.metadataList.map(x=> x.id===m.id?({...x, value: e.target.value}):x) }))} className="p-2 bg-[#011415] text-white border border-white/6 rounded flex-1" />
+                          <button type="button" onClick={()=>setForm(f=>({...f, metadataList: f.metadataList.filter(x=> x.id!==m.id) }))} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400">Remover</button>
+                        </div>
+                      ))}
+                      {(form.metadataList || []).length===0 ? <div className="text-sm text-gray-400">Nenhum metadado</div> : null}
+                    </div>
+                  </div>
                   <div className="flex justify-end gap-2">
                     <button type="button" onClick={()=>{ setShowAdd(false); setForm({ name: '', description: '', space: 0, category: '' }); }} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
                     <button className="px-3 py-1 bg-white/6 rounded">Criar</button>
@@ -347,19 +370,19 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
               </tr>
             </thead>
             <tbody>
-              {items.map(i=> (
-                <tr key={i.id} className="border-t border-white/6">
-                  <td className="py-2">{i.name}</td>
-                  <td className="py-2">{i.description || '-'}</td>
-                  <td className="py-2">{i.space}</td>
-                  <td className="py-2">{i.category || '-'}</td>
-                  <td className="py-2 flex gap-2">
-                    <button onClick={()=>handleEditClick(i)} className="px-2 py-1 border border-white/10 rounded text-sm">Editar</button>
-                    <button onClick={()=>handleDelete(i.id)} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400">Remover</button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+                {items.map(i=> (
+                  <tr key={i.id} className="border-t border-white/6 cursor-pointer" onClick={()=>{ setSelectedItem(i); setShowViewModal(true); }}>
+                    <td className="py-2">{i.name}</td>
+                    <td className="py-2">&nbsp;</td>
+                    <td className="py-2">{i.space}</td>
+                    <td className="py-2">{i.category || '-'}</td>
+                    <td className="py-2 flex gap-2">
+                      <button onClick={(e)=>{ e.stopPropagation(); handleEditClick(i); }} className="px-2 py-1 border border-white/10 rounded text-sm">Editar</button>
+                      <button onClick={(e)=>{ e.stopPropagation(); handleDelete(i.id); }} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400">Remover</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
           </table>
         </div>
 
@@ -384,11 +407,62 @@ export default function InventoryPanel({ character, onCharacterUpdate, editable 
                     <option value="IV">IV</option>
                   </select>
                 </div>
+                <div>
+                  <div className="flex justify-between items-center">
+                    <div className="text-sm text-gray-400">Metadados</div>
+                    <button type="button" onClick={()=>setEditForm(f=>({...f, metadataList: [...(f.metadataList||[]), { id: Date.now(), key: '', value: '' }] }))} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar</button>
+                  </div>
+                  <div className="space-y-2 mt-2">
+                    {(editForm.metadataList || []).map(m => (
+                      <div key={m.id} className="flex gap-2">
+                        <input placeholder="Chave" value={m.key} onChange={e=>setEditForm(f=>({...f, metadataList: f.metadataList.map(x=> x.id===m.id?({...x, key: e.target.value}):x) }))} className="p-2 bg-[#011415] text-white border border-white/6 rounded w-1/3" />
+                        <input placeholder="Valor" value={m.value} onChange={e=>setEditForm(f=>({...f, metadataList: f.metadataList.map(x=> x.id===m.id?({...x, value: e.target.value}):x) }))} className="p-2 bg-[#011415] text-white border border-white/6 rounded flex-1" />
+                        <button type="button" onClick={()=>setEditForm(f=>({...f, metadataList: f.metadataList.filter(x=> x.id!==m.id) }))} className="px-2 py-1 border border-white/10 rounded text-sm text-red-400">Remover</button>
+                      </div>
+                    ))}
+                    {(editForm.metadataList || []).length===0 ? <div className="text-sm text-gray-400">Nenhum metadado</div> : null}
+                  </div>
+                </div>
                 <div className="flex justify-end gap-2">
                   <button type="button" onClick={()=>{ setShowEditModal(false); setEditItemId(null); }} className="px-3 py-1 border border-white/10 rounded">Cancelar</button>
                   <button className="px-3 py-1 bg-white/6 rounded">Salvar</button>
                 </div>
               </form>
+            </div>
+          </div>
+        ) : null}
+
+        {showViewModal && selectedItem ? (
+          <div className="fixed inset-0 flex items-center justify-center bg-black/60 z-50">
+            <div className="bg-[#021018] p-4 rounded w-full max-w-lg">
+              <div className="flex justify-between items-center mb-3">
+                <h4 className="font-bold">Detalhes do item</h4>
+                <button onClick={()=>{ setShowViewModal(false); setSelectedItem(null); }} className="px-2 py-1 border border-white/10 rounded">Fechar</button>
+              </div>
+              <div className="space-y-3">
+                <div><strong>Nome:</strong> {selectedItem.name}</div>
+                <div><strong>Descrição:</strong></div>
+                <div className="p-2 bg-[#011415] rounded text-sm">{selectedItem.description || '—'}</div>
+                <div><strong>Espaço:</strong> {selectedItem.space}</div>
+                <div><strong>Categoria:</strong> {selectedItem.category || '—'}</div>
+                <div><strong>Metadados:</strong></div>
+                <div className="space-y-2">
+                  {selectedItem.metadata && Object.keys(selectedItem.metadata).length > 0 ? (
+                    Object.keys(selectedItem.metadata).map(k => (
+                      <div key={k} className="flex flex-col">
+                        <label className="text-xs text-gray-400">{k}</label>
+                        <input readOnly value={String(selectedItem.metadata[k] ?? '')} className="p-2 bg-[#011415] rounded border border-white/6" />
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-400">Sem metadados</div>
+                  )}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button onClick={()=>{ setShowViewModal(false); setSelectedItem(null); }} className="px-3 py-1 border rounded">Fechar</button>
+                  <button onClick={()=>{ setShowViewModal(false); setSelectedItem(null); handleEditClick(selectedItem); }} className="px-3 py-1 bg-white/6 rounded">Editar</button>
+                </div>
+              </div>
             </div>
           </div>
         ) : null}

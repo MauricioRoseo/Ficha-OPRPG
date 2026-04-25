@@ -296,8 +296,38 @@ body {
 .panel .stat-box { background: rgba(255,255,255,0.02); padding:10px; border-radius:8px; }
 
 /* Modal styles for protection form */
-.modal-overlay { background: rgba(0,0,0,0.6); }
-.modal-card { box-shadow: 0 20px 60px rgba(0,0,0,0.6); }
+.modal-overlay { background: rgba(0,0,0,0.6); display: flex; align-items: center; justify-content: center; padding: 1rem; }
+.modal-card { box-shadow: 0 20px 60px rgba(0,0,0,0.6); max-height: 90vh; overflow-y: auto; margin: 0.5rem; width: auto; max-width: 100%; }
+
+/* modal structural helpers */
+.modal-card { position: relative; display: flex; flex-direction: column; }
+.modal-body { overflow: auto; max-height: calc(90vh - 140px); padding-top: 0.25rem; padding-bottom: 0.5rem; }
+.modal-close { position: absolute; top: 8px; right: 8px; z-index: 30; }
+
+/* ensure any modal direct child inside overlay becomes a responsive modal-card
+   many components render: <div class="fixed inset-0 ..."> <div class="bg-... p-4 ...">...</div> </div>
+   this selector targets that inner div to cap height and allow scrolling when content is long */
+.fixed.inset-0 > div {
+  max-height: 90vh;
+  overflow: auto;
+  margin: 0.5rem;
+  width: auto;
+  max-width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.6);
+}
+
+@media (max-width: 640px) {
+  .fixed.inset-0 > div { margin: 0; width: 100%; border-radius: 0.75rem; max-height: calc(100vh - 1rem); }
+}
+
+/* Mobile-specific adjustments: place modal near bottom and make it full-width with safe spacing */
+@media (max-width: 640px) {
+  .modal-overlay { align-items: flex-end; padding: 0.5rem; }
+  .modal-card { border-radius: 0.75rem; max-height: calc(100vh - 1rem); margin: 0; width: 100%; }
+  /* ensure sticky footer/header in modals keep spacing on small screens */
+  .modal-sticky-header { padding-top: 8px; }
+  .modal-sticky-footer { padding-bottom: 12px; }
+}
 /* responsive adjustments */
 @media (max-width: 900px) {
   .ficha-paper { width: 95vw; padding: 0.75rem; }

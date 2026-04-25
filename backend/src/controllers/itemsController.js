@@ -22,6 +22,7 @@ const ItemsController = {
     const role = req.user && req.user.role;
     if (!(role === 'master' || role === 'admin')) return res.status(403).json({ message: 'Acesso negado' });
     const data = req.body || {};
+    console.log('items.create metadata:', data.metadata);
     ItemsModel.create(data, (err, result) => {
       if (err) return res.status(500).json(err);
       ItemsModel.findById(result.insertId, (err2, created) => {
@@ -36,6 +37,7 @@ const ItemsController = {
     if (!(role === 'master' || role === 'admin')) return res.status(403).json({ message: 'Acesso negado' });
     const id = req.params.id;
     const data = req.body || {};
+    console.log('items.update metadata:', data.metadata);
     ItemsModel.update(id, data, (err, result) => {
       if (err) return res.status(500).json(err);
       ItemsModel.findById(id, (err2, updated) => {

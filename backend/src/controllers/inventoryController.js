@@ -18,7 +18,8 @@ const InventoryController = {
     CharacterModel.findById(data.character_id, (err, character) => {
       if (err) return res.status(500).json(err);
       if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-      if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+      const role = req.user && req.user.role;
+      if (!req.user || (character.user_id !== req.user.id && !(role === 'master' || role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
       InventoryModel.create(data, (err2, result) => {
         if (err2) return res.status(500).json(err2);
@@ -55,7 +56,7 @@ const InventoryController = {
               if (err5) return res.status(500).json(err5);
               InventoryModel.findById(result.insertId, (err6, created) => {
                 if (err6) return res.status(500).json(err6);
-                res.status(201).json({ item: created, carga_atual: cargaAtual, carga_maxima: cargaMax });
+                    res.status(201).json({ item: created, carga_atual: cargaAtual, carga_maxima: cargaMax });
               });
             });
           });
@@ -74,7 +75,8 @@ const InventoryController = {
       CharacterModel.findById(item.character_id, (err2, character) => {
         if (err2) return res.status(500).json(err2);
         if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-        if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+        const role = req.user && req.user.role;
+        if (!req.user || (character.user_id !== req.user.id && !(role === 'master' || role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
         InventoryModel.update(id, data, (err3) => {
           if (err3) return res.status(500).json(err3);
@@ -128,7 +130,8 @@ const InventoryController = {
       CharacterModel.findById(item.character_id, (err2, character) => {
         if (err2) return res.status(500).json(err2);
         if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-        if (!req.user || character.user_id !== req.user.id) return res.status(403).json({ message: 'Acesso negado' });
+        const role = req.user && req.user.role;
+        if (!req.user || (character.user_id !== req.user.id && !(role === 'master' || role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
 
         InventoryModel.deleteById(id, (err3) => {
           if (err3) return res.status(500).json(err3);

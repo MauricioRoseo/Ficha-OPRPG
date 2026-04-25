@@ -256,6 +256,11 @@ SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATAB
 SET @sql = IF(@c=0, "ALTER TABLE users ADD COLUMN role ENUM('player','master','admin') DEFAULT 'player'", 'SELECT "role already exists"');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- add metadata column to inventory if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='inventory' AND COLUMN_NAME='metadata';
+SET @sql = IF(@c=0, 'ALTER TABLE inventory ADD COLUMN metadata JSON DEFAULT NULL', 'SELECT "inventory.metadata already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- ensure patrimonio is TEXT (if it was previously created as INT by older seed scripts)
 SELECT DATA_TYPE INTO @dt FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='characters' AND COLUMN_NAME='patrimonio';
 SET @sql = IF(@dt IS NULL, 'SELECT "patrimonio missing"', IF(@dt <> 'text', 'ALTER TABLE characters MODIFY patrimonio TEXT DEFAULT NULL', 'SELECT "patrimonio already text"'));

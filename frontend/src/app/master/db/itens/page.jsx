@@ -6,15 +6,18 @@ import { useRouter } from 'next/navigation';
 function Modal({ open, onClose, title, children }){
   if(!open) return null;
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center">
+    <div className="modal-overlay fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/60" onClick={onClose}></div>
-      <div className="relative bg-[#071018] border border-white/10 rounded-lg p-6 w-full max-w-2xl z-10">
-        <div className="flex items-center justify-between mb-4">
+      <div className="modal-card relative bg-[#071018] border border-white/10 rounded-lg p-4 w-full max-w-2xl z-10">
+        <button onClick={onClose} className="modal-close px-2 py-1 border rounded text-sm">Fechar</button>
+        <div className="modal-sticky-header flex items-center justify-between mb-4">
           <h3 className="font-bold">{title}</h3>
-          <button onClick={onClose} className="px-2 py-1 border rounded text-sm">Fechar</button>
         </div>
-        <div>
+        <div className="modal-body">
           {children}
+        </div>
+        <div className="modal-sticky-footer flex justify-end mt-2">
+          <button onClick={onClose} className="px-3 py-1 border rounded">Fechar</button>
         </div>
       </div>
     </div>
@@ -85,7 +88,9 @@ export default function ItemsAdminPage(){
     if(!form.name){ alert('Preencha o nome'); return; }
     try{
       const payload = { ...form };
-      try{ payload.metadata = form.metadata ? JSON.parse(form.metadata) : null; }catch(e){ /* leave string */ }
+      try{
+        payload.metadata = form.metadata ? JSON.parse(form.metadata) : null;
+      }catch(e){ alert('Metadata inválido: informe JSON válido, por exemplo {"Tipo":"Item Operacional"}'); return; }
       const res = await fetch('http://localhost:3001/items', { method: 'POST', headers: authHeaders, body: JSON.stringify(payload) });
       if(!res.ok){ const j = await res.json().catch(()=>null); throw new Error((j && j.message) || 'Erro'); }
       alert('Item criado');
@@ -101,7 +106,7 @@ export default function ItemsAdminPage(){
     if(!form.name){ alert('Preencha o nome'); return; }
     try{
       const payload = { ...form };
-      try{ payload.metadata = form.metadata ? JSON.parse(form.metadata) : null; }catch(e){ }
+      try{ payload.metadata = form.metadata ? JSON.parse(form.metadata) : null; }catch(e){ alert('Metadata inválido: informe JSON válido'); return; }
       const res = await fetch(`http://localhost:3001/items/${selected.id}`, { method: 'PUT', headers: authHeaders, body: JSON.stringify(payload) });
       if(!res.ok){ const j = await res.json().catch(()=>null); throw new Error((j && j.message) || 'Erro'); }
       alert('Item atualizado');

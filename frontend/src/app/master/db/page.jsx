@@ -39,28 +39,22 @@ export default function MasterDbPage() {
       return fallback;
     });
 
-  const pFeatures = safeFetchJson('http://localhost:3001/features', { headers });
-  const pClasses = safeFetchJson('http://localhost:3001/templates/classes', { headers });
-  const pOrigins = safeFetchJson('http://localhost:3001/templates/origins', { headers });
-  const pRituals = safeFetchJson('http://localhost:3001/rituals', { headers });
+    const pFeatures = safeFetchJson('http://localhost:3001/features', { headers });
+    const pClasses = safeFetchJson('http://localhost:3001/templates/classes', { headers });
+    const pOrigins = safeFetchJson('http://localhost:3001/templates/origins', { headers });
+    const pRituals = safeFetchJson('http://localhost:3001/rituals', { headers });
+    const pTrails = safeFetchJson('http://localhost:3001/templates/trails', { headers });
     const pItems = safeFetchJson('http://localhost:3001/items?search=', { headers });
     const pProtections = safeFetchJson('http://localhost:3001/protections/templates', { headers }, { templates: [] });
     const pUsers = safeFetchJson('http://localhost:3001/users', { headers });
 
-    Promise.all([pFeatures, pClasses, pOrigins, pRituals, pItems, pProtections, pUsers])
-      .then(async ([features, classes, origins, rituals, items, protectionsResp, users]) => {
+    Promise.all([pFeatures, pClasses, pOrigins, pRituals, pTrails, pItems, pProtections, pUsers])
+      .then(async ([features, classes, origins, rituals, trails, items, protectionsResp, users]) => {
         const periciasCount = (features || []).filter(f => (f.type || '').toLowerCase() === 'pericia').length;
         const habilidadesCount = (features || []).filter(f => (f.type || '').toLowerCase() === 'habilidade').length;
 
-        // trails: fetch per-class trails and sum
-        let trailsCount = 0;
-        try {
-          const trailsPromises = (classes || []).map(c => fetch(`http://localhost:3001/templates/trails/${c.id}`).then(r => r.ok ? r.json() : []));
-          const trailsByClass = await Promise.all(trailsPromises);
-          trailsCount = trailsByClass.reduce((s, arr) => s + (arr ? arr.length : 0), 0);
-        } catch (e) {
-          trailsCount = 0;
-        }
+        // trails: use the full list endpoint so unassigned trails are counted too
+        const trailsCount = (trails || []).length;
 
         setCounts({
           usuarios: (users || []).length,
