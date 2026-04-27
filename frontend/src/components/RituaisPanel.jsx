@@ -16,6 +16,9 @@ export default function RituaisPanel({ character, attributes, editable = false }
   const [showModifiers, setShowModifiers] = useState(false);
   const [modifiers, setModifiers] = useState([]);
   const initialNew = { name: '', element: '', description: '', circle: 1, execution: '', alcance: '', duration: '', resistencia_pericia_id: null, resistencia_pericia_name: '', aprimoramento_discente: false, custo_aprimoramento_discente: '', descricao_aprimoramento_discente: '', aprimoramento_verdadeiro: false, custo_aprimoramento_verdadeiro: '', descricao_aprimoramento_verdadeiro: '', symbol_image: '', symbol_image_secondary: '' };
+  // include effect and alvo fields
+  initialNew.effect = '';
+  initialNew.alvo = '';
   const [newRitual, setNewRitual] = useState(initialNew);
   const [periciaModalOpen, setPericiaModalOpen] = useState(false);
   const [selectedCircle, setSelectedCircle] = useState(getMaxCircleAccess());
@@ -172,7 +175,9 @@ export default function RituaisPanel({ character, attributes, editable = false }
         description: newRitual.description,
   circulo: selectedCircle || newRitual.circle || 1,
         execution: newRitual.execution || null,
+        effect: newRitual.effect || null,
         alcance: newRitual.alcance || null,
+        alvo: newRitual.alvo || null,
         duration: newRitual.duration || null,
         resistencia_pericia_id: newRitual.resistencia_pericia_id || null,
         resistencia_pericia_name: newRitual.resistencia_pericia_name || null,
@@ -237,7 +242,7 @@ export default function RituaisPanel({ character, attributes, editable = false }
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {rituais.map(r => (
-            <div key={r.id} className="p-3 bg-[#011415] border border-white/6 rounded cursor-pointer flex gap-3" onClick={() => { setSelected(r); if (editable) { setEditMode(true); setEditForm({ name: r.snapshot_name, element: r.snapshot_element, description: r.snapshot_description, execution: r.snapshot_execution, alcance: r.snapshot_alcance, duration: r.snapshot_duration, circulo: r.circulo, dt_resistencia: r.dt_resistencia || r.snapshot_dt_resistencia || 0, symbol_image: r.snapshot_symbol || r.symbol || '', symbol_image_secondary: r.snapshot_symbol_secondary || '' }); } else { setShowDetail(true); } }}>
+            <div key={r.id} className="p-3 bg-[#011415] border border-white/6 rounded cursor-pointer flex gap-3" onClick={() => { setSelected(r); if (editable) { setEditMode(true); setEditForm({ name: r.snapshot_name, element: r.snapshot_element, description: r.snapshot_description, effect: r.snapshot_effect, execution: r.snapshot_execution, alcance: r.snapshot_alcance, alvo: r.snapshot_alvo, duration: r.snapshot_duration, circulo: r.circulo, dt_resistencia: r.dt_resistencia || r.snapshot_dt_resistencia || 0, symbol_image: r.snapshot_symbol || r.symbol || '', symbol_image_secondary: r.snapshot_symbol_secondary || '', resistencia_pericia_id: r.snapshot_resistencia_pericia_id || null, resistencia_pericia_name: r.snapshot_resistencia_pericia_name || null, aprimoramento_discente: r.snapshot_aprimoramento_discente || 0, custo_aprimoramento_discente: r.snapshot_custo_aprimoramento_discente || null, descricao_aprimoramento_discente: r.snapshot_descricao_aprimoramento_discente || null, aprimoramento_verdadeiro: r.snapshot_aprimoramento_verdadeiro || 0, custo_aprimoramento_verdadeiro: r.snapshot_custo_aprimoramento_verdadeiro || null, descricao_aprimoramento_verdadeiro: r.snapshot_descricao_aprimoramento_verdadeiro || null }); } else { setShowDetail(true); } }}>
               <div className="w-12 h-12 bg-[#021018] flex items-center justify-center rounded">
                 {r.snapshot_symbol ? <img src={r.snapshot_symbol} alt={r.snapshot_name} className="w-full h-full object-contain" /> : <div className="text-xs text-gray-400">SÍM</div>}
               </div>
@@ -246,6 +251,9 @@ export default function RituaisPanel({ character, attributes, editable = false }
                 <div className="text-xs text-gray-400">
                   {r.snapshot_element || r.snapshot_element} • Círculo <span className="ml-1">{r.circulo || '-'}</span>
                 </div>
+                  <div className="mt-1 text-xs text-gray-300">
+                    {r.snapshot_effect ? (r.snapshot_effect.length > 80 ? r.snapshot_effect.slice(0, 80) + '...' : r.snapshot_effect) : (r.snapshot_description ? (r.snapshot_description.length > 80 ? r.snapshot_description.slice(0, 80) + '...' : r.snapshot_description) : '')}
+                  </div>
               </div>
               <div className="ml-auto flex items-center gap-2">
                 <button onClick={(e)=>{ e.stopPropagation(); handleRemove(r.id); }} className="px-2 py-1 border border-white/10 rounded text-sm">Remover</button>
@@ -322,11 +330,13 @@ export default function RituaisPanel({ character, attributes, editable = false }
                   </div>
                 </div>
                 <input placeholder="Execução" value={newRitual.execution} onChange={e=>setNewRitual(n=>({...n, execution: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
-                <div className="grid grid-cols-2 gap-2">
-                  <input placeholder="Alvo / Área" value={newRitual.alcance} onChange={e=>setNewRitual(n=>({...n, alcance: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
-                  <input placeholder="Duração" value={newRitual.duration} onChange={e=>setNewRitual(n=>({...n, duration: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                <textarea placeholder="Efeito" value={newRitual.effect || ''} onChange={e=>setNewRitual(n=>({...n, effect: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded mt-2" />
+                <div className="grid grid-cols-2 gap-2 mt-2">
+                  <input placeholder="Alcance" value={newRitual.alcance} onChange={e=>setNewRitual(n=>({...n, alcance: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  <input placeholder="Alvo / Área" value={newRitual.alvo || ''} onChange={e=>setNewRitual(n=>({...n, alvo: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
                 </div>
-                <textarea placeholder="Descrição" value={newRitual.description} onChange={e=>setNewRitual(n=>({...n, description: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                <input placeholder="Duração" value={newRitual.duration} onChange={e=>setNewRitual(n=>({...n, duration: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded mt-2" />
+                <textarea placeholder="Descrição" value={newRitual.description} onChange={e=>setNewRitual(n=>({...n, description: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded mt-2" />
                 {/* resistência vinculada a perícia via modal */}
 
                 <div className="grid grid-cols-2 gap-2">
@@ -394,8 +404,10 @@ export default function RituaisPanel({ character, attributes, editable = false }
                             name: selected.snapshot_name,
                             element: selected.snapshot_element,
                             description: selected.snapshot_description,
+                            effect: selected.snapshot_effect,
                             execution: selected.snapshot_execution,
                             alcance: selected.snapshot_alcance,
+                            alvo: selected.snapshot_alvo,
                             duration: selected.snapshot_duration,
                             // circulo and dt_resistencia are NOT edited here per requirements
                             symbol_image: selected.snapshot_symbol || selected.symbol || selected.snapshot_symbol,
@@ -422,8 +434,12 @@ export default function RituaisPanel({ character, attributes, editable = false }
                   <div>{selected.snapshot_execution || '-'}</div>
                 </div>
                 <div>
-                  <div className="text-sm text-gray-400">Alvo / Área</div>
+                  <div className="text-sm text-gray-400">Alcance</div>
                   <div>{selected.snapshot_alcance || '-'}</div>
+                </div>
+                <div>
+                  <div className="text-sm text-gray-400">Alvo / Área</div>
+                  <div>{selected.snapshot_alvo || selected.snapshot_alcance || '-'}</div>
                 </div>
                 <div>
                   <div className="text-sm text-gray-400">Duração</div>
@@ -438,8 +454,8 @@ export default function RituaisPanel({ character, attributes, editable = false }
               </div>
 
               <div className="mb-3">
-                <div className="text-sm text-gray-400">Descrição</div>
-                <div>{selected.snapshot_description || '-'}</div>
+                  <div className="text-sm text-gray-400">Efeito</div>
+                <div>{selected.snapshot_effect || selected.snapshot_description || '-'}</div>
               </div>
 
               <div className="mt-3 space-y-2">
@@ -478,9 +494,11 @@ export default function RituaisPanel({ character, attributes, editable = false }
                     snapshot_name: editForm.name,
                     snapshot_element: editForm.element,
                     snapshot_description: editForm.description,
-                    snapshot_execution: editForm.execution,
-                    snapshot_alcance: editForm.alcance,
-                    snapshot_duration: editForm.duration,
+                      snapshot_effect: editForm.effect || null,
+                      snapshot_execution: editForm.execution,
+                      snapshot_alcance: editForm.alcance,
+                      snapshot_alvo: editForm.alvo || null,
+                      snapshot_duration: editForm.duration,
                     snapshot_resistencia_pericia_id: editForm.resistencia_pericia_id || null,
                     snapshot_resistencia_pericia_name: editForm.resistencia_pericia_name || null,
                     snapshot_aprimoramento_discente: editForm.aprimoramento_discente ? 1 : 0,
@@ -510,10 +528,15 @@ export default function RituaisPanel({ character, attributes, editable = false }
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <input placeholder="Execução" value={editForm.execution || ''} onChange={e=>setEditForm(f=>({...f, execution: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
-                  <input placeholder="Alvo / Área" value={editForm.alcance || ''} onChange={e=>setEditForm(f=>({...f, alcance: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  <input placeholder="Alcance" value={editForm.alcance || ''} onChange={e=>setEditForm(f=>({...f, alcance: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
                 </div>
                 <div>
+                  <textarea placeholder="Efeito" value={editForm.effect || ''} onChange={e=>setEditForm(f=>({...f, effect: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded mb-2" />
                   <textarea placeholder="Descrição" value={editForm.description || ''} onChange={e=>setEditForm(f=>({...f, description: e.target.value}))} className="w-full p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <input placeholder="Alvo / Área" value={editForm.alvo || ''} onChange={e=>setEditForm(f=>({...f, alvo: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />
+                  <div />
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <input placeholder="Imagem símbolo principal (URL)" value={editForm.symbol_image || ''} onChange={e=>setEditForm(f=>({...f, symbol_image: e.target.value}))} className="p-2 bg-[#011415] text-white border border-white/6 rounded" />

@@ -2,7 +2,7 @@ const db = require('../config/database');
 
 const RitualModel = {
   create: (data, callback) => {
-    const sql = `INSERT INTO rituals_catalog (name, circle, element, description, effect, execution, alcance, duration, resistencia_pericia_id, aprimoramento_discente, custo_aprimoramento_discente, descricao_aprimoramento_discente, aprimoramento_verdadeiro, custo_aprimoramento_verdadeiro, descricao_aprimoramento_verdadeiro, symbol_image, symbol_image_secondary, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
+    const sql = `INSERT INTO rituals_catalog (name, circle, element, description, effect, execution, alcance, alvo, duration, resistencia_pericia_id, aprimoramento_discente, custo_aprimoramento_discente, descricao_aprimoramento_discente, aprimoramento_verdadeiro, custo_aprimoramento_verdadeiro, descricao_aprimoramento_verdadeiro, symbol_image, symbol_image_secondary, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`;
     const values = [
       data.name,
       data.circle || null,
@@ -11,6 +11,7 @@ const RitualModel = {
       data.effect || null,
       data.execution || null,
       data.alcance || null,
+      data.alvo || null,
       data.duration || null,
       data.resistencia_pericia_id || null,
       data.aprimoramento_discente ? 1 : 0,
@@ -49,7 +50,7 @@ const RitualModel = {
   }
   ,
   update: (id, data, callback) => {
-    const sql = `UPDATE rituals_catalog SET name = ?, circle = ?, element = ?, description = ?, effect = ?, execution = ?, alcance = ?, duration = ?, resistencia_pericia_id = ?, aprimoramento_discente = ?, custo_aprimoramento_discente = ?, descricao_aprimoramento_discente = ?, aprimoramento_verdadeiro = ?, custo_aprimoramento_verdadeiro = ?, descricao_aprimoramento_verdadeiro = ?, symbol_image = ?, symbol_image_secondary = ? WHERE id = ?`;
+    const sql = `UPDATE rituals_catalog SET name = ?, circle = ?, element = ?, description = ?, effect = ?, execution = ?, alcance = ?, alvo = ?, duration = ?, resistencia_pericia_id = ?, aprimoramento_discente = ?, custo_aprimoramento_discente = ?, descricao_aprimoramento_discente = ?, aprimoramento_verdadeiro = ?, custo_aprimoramento_verdadeiro = ?, descricao_aprimoramento_verdadeiro = ?, symbol_image = ?, symbol_image_secondary = ? WHERE id = ?`;
     const values = [
       data.name,
       data.circle || null,
@@ -58,6 +59,7 @@ const RitualModel = {
       data.effect || null,
       data.execution || null,
       data.alcance || null,
+      data.alvo || null,
       data.duration || null,
       data.resistencia_pericia_id || null,
       data.aprimoramento_discente ? 1 : 0,

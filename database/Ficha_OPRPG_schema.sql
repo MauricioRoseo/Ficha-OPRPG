@@ -356,6 +356,26 @@ SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATAB
 SET @sql = IF(@c=0, 'ALTER TABLE character_rituals ADD COLUMN dt_modifiers JSON DEFAULT NULL', 'SELECT "dt_modifiers already exists"');
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
 
+-- add alvo to rituals_catalog if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='rituals_catalog' AND COLUMN_NAME='alvo';
+SET @sql = IF(@c=0, "ALTER TABLE rituals_catalog ADD COLUMN alvo VARCHAR(150) DEFAULT NULL", 'SELECT "rituals_catalog.alvo already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- add alvo to rituals (per-character) if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='rituals' AND COLUMN_NAME='alvo';
+SET @sql = IF(@c=0, "ALTER TABLE rituals ADD COLUMN alvo VARCHAR(150) DEFAULT NULL", 'SELECT "rituals.alvo already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- add snapshot_alvo to character_rituals if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='character_rituals' AND COLUMN_NAME='snapshot_alvo';
+SET @sql = IF(@c=0, "ALTER TABLE character_rituals ADD COLUMN snapshot_alvo VARCHAR(150) DEFAULT NULL", 'SELECT "character_rituals.snapshot_alvo already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+-- add snapshot_effect to character_rituals if missing
+SELECT COUNT(*) INTO @c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='character_rituals' AND COLUMN_NAME='snapshot_effect';
+SET @sql = IF(@c=0, "ALTER TABLE character_rituals ADD COLUMN snapshot_effect TEXT DEFAULT NULL", 'SELECT "character_rituals.snapshot_effect already exists"');
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
 -- Systems
 CREATE TABLE IF NOT EXISTS systems (
     id INT AUTO_INCREMENT PRIMARY KEY,

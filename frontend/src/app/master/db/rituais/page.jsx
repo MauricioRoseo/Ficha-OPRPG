@@ -29,7 +29,8 @@ export default function RitualsAdminPage(){
   const [detailOpen, setDetailOpen] = useState(false);
   const [editing, setEditing] = useState(false);
   const [creatingOpen, setCreatingOpen] = useState(false);
-  const [form, setForm] = useState({ name: '', circle: '', element: '', description: '', effect: '', execution: '', alcance: '', duration: '', resistencia_pericia_id: '', aprimoramento_discente: false, custo_aprimoramento_discente: '', descricao_aprimoramento_discente: '', aprimoramento_verdadeiro: false, custo_aprimoramento_verdadeiro: '', descricao_aprimoramento_verdadeiro: '', symbol_image: '', symbol_image_secondary: '' });
+  const [form, setForm] = useState({ name: '', circle: '', element: '', description: '', effect: '', execution: '', alcance: '', alvo: '', duration: '', resistencia_pericia_id: '', aprimoramento_discente: false, custo_aprimoramento_discente: '', descricao_aprimoramento_discente: '', aprimoramento_verdadeiro: false, custo_aprimoramento_verdadeiro: '', descricao_aprimoramento_verdadeiro: '', symbol_image: '', symbol_image_secondary: '' });
+  const [features, setFeatures] = useState([]);
 
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const authHeaders = token ? { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } : { 'Content-Type': 'application/json' };
@@ -37,6 +38,15 @@ export default function RitualsAdminPage(){
   useEffect(()=>{
     if(!token){ router.push('/'); return; }
     fetchList();
+    // fetch features (perícias) for selects
+    (async ()=>{
+      try{
+        const res = await fetch('http://localhost:3001/features', { headers: { Authorization: token ? `Bearer ${token}` : '' } });
+        if(!res.ok) throw new Error('Erro ao buscar perícias');
+        const data = await res.json();
+        setFeatures(Array.isArray(data) ? data : []);
+      }catch(e){ console.error('Erro carregando perícias', e); setFeatures([]); }
+    })();
   }, []);
 
   const fetchList = async ()=>{
@@ -66,6 +76,7 @@ export default function RitualsAdminPage(){
         effect: data.effect || '',
         execution: data.execution || '',
         alcance: data.alcance || '',
+        alvo: data.alvo || '',
         duration: data.duration || '',
         resistencia_pericia_id: data.resistencia_pericia_id || '',
         aprimoramento_discente: !!data.aprimoramento_discente,
@@ -163,10 +174,21 @@ export default function RitualsAdminPage(){
             <div><span className="text-gray-400">Efeito: </span><div className="mt-1 text-gray-200">{selected.effect || '—'}</div></div>
             <div><span className="text-gray-400">Execução: </span>{selected.execution || '—'}</div>
             <div><span className="text-gray-400">Alcance: </span>{selected.alcance || '—'}</div>
+            <div><span className="text-gray-400">Alvo / Área: </span>{selected.alvo || '—'}</div>
             <div><span className="text-gray-400">Duração: </span>{selected.duration || '—'}</div>
-            <div><span className="text-gray-400">Resistência (perícia id): </span>{selected.resistencia_pericia_id || '—'}</div>
-            <div><span className="text-gray-400">Aprimoramento discente: </span>{selected.aprimoramento_discente ? 'Sim' : 'Não'}</div>
-            <div><span className="text-gray-400">Aprimoramento verdadeiro: </span>{selected.aprimoramento_verdadeiro ? 'Sim' : 'Não'}</div>
+            <div><span className="text-gray-400">Resistência (perícia id): </span>{selected.resistencia_pericia_id || selected.resistencia_pericia_name || '—'}</div>
+            <div>
+              <span className="text-gray-400">Aprimoramento discente: </span>
+              <div className="text-sm">{selected.aprimoramento_discente ? 'Sim' : 'Não'} {selected.custo_aprimoramento_discente ? `• +${selected.custo_aprimoramento_discente} PE` : ''}</div>
+              {selected.descricao_aprimoramento_discente ? <div className="text-xs text-gray-400">Descrição: {selected.descricao_aprimoramento_discente}</div> : null}
+            </div>
+            <div>
+              <span className="text-gray-400">Aprimoramento verdadeiro: </span>
+              <div className="text-sm">{selected.aprimoramento_verdadeiro ? 'Sim' : 'Não'} {selected.custo_aprimoramento_verdadeiro ? `• +${selected.custo_aprimoramento_verdadeiro} PE` : ''}</div>
+              {selected.descricao_aprimoramento_verdadeiro ? <div className="text-xs text-gray-400">Descrição: {selected.descricao_aprimoramento_verdadeiro}</div> : null}
+            </div>
+            {selected.symbol_image ? <div><span className="text-gray-400">Símbolo: </span><img src={selected.symbol_image} alt="símbolo" className="inline-block w-8 h-8 ml-2"/></div> : null}
+            {selected.symbol_image_secondary ? <div><span className="text-gray-400">Símbolo secundário: </span><img src={selected.symbol_image_secondary} alt="símbolo secundário" className="inline-block w-8 h-8 ml-2"/></div> : null}
             <div className="flex gap-2">
               <button onClick={startEdit} className="px-3 py-1 bg-blue-600/80 rounded">Editar</button>
               <button onClick={()=>handleDelete(selected.id)} className="px-3 py-1 bg-red-600/60 rounded">Remover</button>
@@ -178,23 +200,63 @@ export default function RitualsAdminPage(){
           <div className="space-y-2">
             <input placeholder="Nome" value={form.name} onChange={e=>setForm(f=>({...f, name: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
             <div className="grid grid-cols-3 gap-2">
-              <input type="number" placeholder="Círculo" value={form.circle} onChange={e=>setForm(f=>({...f, circle: Number(e.target.value)}))} className="p-2 rounded bg-[#021018] border border-white/6" />
-              <input placeholder="Elemento" value={form.element} onChange={e=>setForm(f=>({...f, element: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+              <select value={form.circle || ''} onChange={e=>setForm(f=>({...f, circle: Number(e.target.value)}))} className="p-2 rounded bg-[#021018] border border-white/6">
+                <option value="">Círculo</option>
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+                <option value={4}>4</option>
+              </select>
+              <select value={form.element || ''} onChange={e=>setForm(f=>({...f, element: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6">
+                <option value="">Elemento</option>
+                <option value="Conhecimento">Conhecimento</option>
+                <option value="Sangue">Sangue</option>
+                <option value="Morte">Morte</option>
+                <option value="Energia">Energia</option>
+                <option value="Medo">Medo</option>
+              </select>
               <input placeholder="Execução" value={form.execution} onChange={e=>setForm(f=>({...f, execution: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
             </div>
             <textarea placeholder="Descrição" value={form.description} onChange={e=>setForm(f=>({...f, description: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
             <textarea placeholder="Efeito" value={form.effect} onChange={e=>setForm(f=>({...f, effect: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
-            <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-2 gap-2">
               <input placeholder="Alcance" value={form.alcance} onChange={e=>setForm(f=>({...f, alcance: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
               <input placeholder="Duração" value={form.duration} onChange={e=>setForm(f=>({...f, duration: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-400">Aprimoramento discente</label>
-              <input type="checkbox" checked={form.aprimoramento_discente} onChange={e=>setForm(f=>({...f, aprimoramento_discente: e.target.checked}))} />
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="Alvo / Área" value={form.alvo || ''} onChange={e=>setForm(f=>({...f, alvo: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+              <div />
             </div>
-            <div className="flex items-center gap-2">
-              <label className="text-xs text-gray-400">Aprimoramento verdadeiro</label>
-              <input type="checkbox" checked={form.aprimoramento_verdadeiro} onChange={e=>setForm(f=>({...f, aprimoramento_verdadeiro: e.target.checked}))} />
+            <div className="grid grid-cols-2 gap-2">
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-400">Aprimoramento discente</label>
+                <input type="checkbox" checked={form.aprimoramento_discente} onChange={e=>setForm(f=>({...f, aprimoramento_discente: e.target.checked}))} />
+              </div>
+              <div className="flex items-center gap-2">
+                <label className="text-xs text-gray-400">Aprimoramento verdadeiro</label>
+                <input type="checkbox" checked={form.aprimoramento_verdadeiro} onChange={e=>setForm(f=>({...f, aprimoramento_verdadeiro: e.target.checked}))} />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="Custo Discente (PE)" value={form.custo_aprimoramento_discente || ''} onChange={e=>setForm(f=>({...f, custo_aprimoramento_discente: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+              <input placeholder="Descrição Discente" value={form.descricao_aprimoramento_discente || ''} onChange={e=>setForm(f=>({...f, descricao_aprimoramento_discente: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="Custo Verdadeiro (PE)" value={form.custo_aprimoramento_verdadeiro || ''} onChange={e=>setForm(f=>({...f, custo_aprimoramento_verdadeiro: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+              <input placeholder="Descrição Verdadeiro" value={form.descricao_aprimoramento_verdadeiro || ''} onChange={e=>setForm(f=>({...f, descricao_aprimoramento_verdadeiro: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <select value={form.resistencia_pericia_id || ''} onChange={e=>setForm(f=>({...f, resistencia_pericia_id: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6">
+                <option value="">Nenhuma</option>
+                {features.filter(fi => fi.type === 'pericia').map(fi => (
+                  <option key={fi.id} value={fi.id}>{fi.name}</option>
+                ))}
+              </select>
+              <input placeholder="Imagem símbolo principal (URL)" value={form.symbol_image || ''} onChange={e=>setForm(f=>({...f, symbol_image: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="Imagem símbolo secundário (URL)" value={form.symbol_image_secondary || ''} onChange={e=>setForm(f=>({...f, symbol_image_secondary: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+              <div />
             </div>
             <div className="flex gap-2">
               <button onClick={handleSaveEdit} className="px-3 py-1 bg-green-600/80 rounded">Salvar</button>
@@ -207,16 +269,62 @@ export default function RitualsAdminPage(){
       <Modal open={creatingOpen} onClose={()=>setCreatingOpen(false)} title="Criar Ritual">
         <div className="space-y-2">
           <input placeholder="Nome" value={form.name} onChange={e=>setForm(f=>({...f, name: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
+
           <div className="grid grid-cols-3 gap-2">
-            <input type="number" placeholder="Círculo" value={form.circle} onChange={e=>setForm(f=>({...f, circle: Number(e.target.value)}))} className="p-2 rounded bg-[#021018] border border-white/6" />
-            <input placeholder="Elemento" value={form.element} onChange={e=>setForm(f=>({...f, element: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+            <select value={form.circle || ''} onChange={e=>setForm(f=>({...f, circle: Number(e.target.value)}))} className="p-2 rounded bg-[#021018] border border-white/6">
+              <option value="">Círculo</option>
+              <option value={1}>1</option>
+              <option value={2}>2</option>
+              <option value={3}>3</option>
+              <option value={4}>4</option>
+            </select>
+            <select value={form.element || ''} onChange={e=>setForm(f=>({...f, element: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6">
+              <option value="">Elemento</option>
+              <option value="Conhecimento">Conhecimento</option>
+              <option value="Sangue">Sangue</option>
+              <option value="Morte">Morte</option>
+              <option value="Energia">Energia</option>
+              <option value="Medo">Medo</option>
+            </select>
             <input placeholder="Execução" value={form.execution} onChange={e=>setForm(f=>({...f, execution: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
           </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <input placeholder="Alcance" value={form.alcance} onChange={e=>setForm(f=>({...f, alcance: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+            <input placeholder="Alvo / Área" value={form.alvo || ''} onChange={e=>setForm(f=>({...f, alvo: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+          </div>
+
+          <input placeholder="Duração" value={form.duration} onChange={e=>setForm(f=>({...f, duration: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+
           <textarea placeholder="Descrição" value={form.description} onChange={e=>setForm(f=>({...f, description: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
           <textarea placeholder="Efeito" value={form.effect} onChange={e=>setForm(f=>({...f, effect: e.target.value}))} className="w-full p-2 rounded bg-[#021018] border border-white/6" />
-          <div className="flex gap-2">
-            <button onClick={handleCreate} className="px-3 py-1 bg-green-600/80 rounded">Criar</button>
-            <button onClick={()=>setCreatingOpen(false)} className="px-3 py-1 border rounded">Cancelar</button>
+
+          <div className="grid grid-cols-2 gap-2">
+            <select value={form.resistencia_pericia_id || ''} onChange={e=>setForm(f=>({...f, resistencia_pericia_id: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6">
+              <option value="">Nenhuma</option>
+              {features.filter(fi => fi.type === 'pericia').map(fi => (
+                <option key={fi.id} value={fi.id}>{fi.name}</option>
+              ))}
+            </select>
+            <input placeholder="Custo Discente (PE)" value={form.custo_aprimoramento_discente || ''} onChange={e=>setForm(f=>({...f, custo_aprimoramento_discente: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <input placeholder="Descrição Discente" value={form.descricao_aprimoramento_discente || ''} onChange={e=>setForm(f=>({...f, descricao_aprimoramento_discente: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+            <input placeholder="Custo Verdadeiro (PE)" value={form.custo_aprimoramento_verdadeiro || ''} onChange={e=>setForm(f=>({...f, custo_aprimoramento_verdadeiro: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <input placeholder="Descrição Verdadeiro" value={form.descricao_aprimoramento_verdadeiro || ''} onChange={e=>setForm(f=>({...f, descricao_aprimoramento_verdadeiro: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+            <input placeholder="Imagem símbolo principal (URL)" value={form.symbol_image || ''} onChange={e=>setForm(f=>({...f, symbol_image: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            <input placeholder="Imagem símbolo secundário (URL)" value={form.symbol_image_secondary || ''} onChange={e=>setForm(f=>({...f, symbol_image_secondary: e.target.value}))} className="p-2 rounded bg-[#021018] border border-white/6" />
+            <div className="flex gap-2">
+              <button onClick={handleCreate} className="px-3 py-1 bg-green-600/80 rounded">Criar</button>
+              <button onClick={()=>setCreatingOpen(false)} className="px-3 py-1 border rounded">Cancelar</button>
+            </div>
           </div>
         </div>
       </Modal>
