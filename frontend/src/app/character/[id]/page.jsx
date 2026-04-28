@@ -74,7 +74,8 @@ export default function CharacterPage() {
         }
         const data = await res.json();
         // backend returns { character, attributes, features }
-        setCharacter(data.character || data);
+        const charObj = data.character || data;
+        setCharacter(charObj);
         setAttributes(data.attributes || {});
   setProtections(data.protections || []);
   setResistances(data.resistances || {});
@@ -91,6 +92,17 @@ export default function CharacterPage() {
           }
         } catch (e) {
           // ignore
+        }
+        // if origin not provided but origin_id exists, fetch origin name as fallback
+        if (charObj && !charObj.origem && charObj.origem_id) {
+          try {
+            const rOrg = await fetch(`http://localhost:3001/templates/origins`, { headers: { Authorization: `Bearer ${token}` } });
+            if (rOrg.ok) {
+              const origins = await rOrg.json();
+              const found = origins.find(o => String(o.id) === String(charObj.origem_id));
+              if (found) setCharacter(c => ({ ...(c||{}), origem: found.name }));
+            }
+          } catch (e) { /* ignore */ }
         }
         setStatus("");
       } catch (err) {

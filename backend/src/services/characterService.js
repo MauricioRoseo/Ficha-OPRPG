@@ -5,24 +5,121 @@ const FeatureService = require('./featureService');
 // Serviço responsável por operações com personagens e cálculo de status máximos
 const CharacterService = {
   createCharacter: (data, callback) => {
-    if (data.level_mode === 'auto') data.nivel = Math.floor(data.nex / 5);
+    try {
+      if (data.level_mode === 'auto') data.nivel = Math.floor(data.nex / 5);
 
-    CharacterModel.create(data, (err, result) => {
-      if (err) return callback(err);
-      const characterId = result.insertId;
-      AttributeModel.create(characterId, (err2) => {
-        if (err2) return callback(err2);
-        return callback(null, result);
-      });
-    });
-  },
+      data.nivel = data.nivel || 1;
+      data.nex = (typeof data.nex !== 'undefined' && data.nex !== null) ? data.nex : 5;
 
-  getAllCharacters: (callback) => {
-    CharacterModel.findAll(callback);
-  },
+      const ClassModel = require('../models/classModel');
+      const OriginModel = require('../models/originModel');
 
-  getCharactersByUser: (userId, callback) => {
-    CharacterModel.findByUserId(userId, callback);
+      const finishCreateFlow = () => {
+        CharacterModel.create(data, (err, result) => {
+          if (err) return callback(err);
+          const characterId = result.insertId;
+
+          AttributeModel.create(characterId, (err2) => {
+            if (err2) return callback(err2);
+
+            const attrs = data.attributes || {};
+            const attrPayload = {
+              forca: typeof attrs.forca !== 'undefined' ? Number(attrs.forca) : 0,
+              agilidade: typeof attrs.agilidade !== 'undefined' ? Number(attrs.agilidade) : 0,
+              intelecto: typeof attrs.intelecto !== 'undefined' ? Number(attrs.intelecto) : 0,
+              vigor: typeof attrs.vigor !== 'undefined' ? Number(attrs.vigor) : 0,
+              presenca: typeof attrs.presenca !== 'undefined' ? Number(attrs.presenca) : 0
+            };
+
+            AttributeModel.update(characterId, attrPayload, (err3) => {
+              if (err3) return callback(err3);
+
+              // add origin features
+              const doOrigin = (cb) => {
+                if (!data.origem_id) return cb(null);
+                OriginModel.findById(data.origem_id, (errO, orgRes) => {
+                  if (errO) return cb(errO);
+                  const org = (Array.isArray(orgRes) && orgRes.length) ? orgRes[0] : orgRes;
+                  if (!org) return cb(null);
+
+                  const toAdd = [];
+                  if (org.pericia_1_id) toAdd.push(org.pericia_1_id);
+                  if (org.pericia_2_id) toAdd.push(org.pericia_2_id);
+                  if (org.habilidade_id) toAdd.push(org.habilidade_id);
+
+                  let i = 0;
+                  const addNext = () => {
+                    if (i >= toAdd.length) return cb(null);
+                    const fid = toAdd[i++];
+                    if (!fid) return addNext();
+                    FeatureService.addFeatureToCharacter(characterId, fid, { training_level: 'none', value: 1 }, (errF) => {
+                      if (errF) console.warn('Erro ao adicionar feature de origem:', errF && errF.message);
+                      addNext();
+                    });
+                  };
+                  addNext();
+                });
+              };
+
+              // add class abilities
+              const doClassAbilities = (cb) => {
+                if (!data.classe_id) return cb(null);
+                ClassModel.findById(data.classe_id, (errC, clsRes) => {
+                  if (errC) return cb(errC);
+                  const cls = (clsRes && clsRes.length && clsRes[0]) ? clsRes[0] : null;
+                  if (!cls) return cb(null);
+                  const abilities = [];
+                  if (cls.primary_ability_id) abilities.push(cls.primary_ability_id);
+                  if (cls.secondary_ability_id) abilities.push(cls.secondary_ability_id);
+
+                  let j = 0;
+                  const addNextCls = () => {
+                    if (j >= abilities.length) return cb(null);
+                    const fid = abilities[j++];
+                    if (!fid) return addNextCls();
+                    FeatureService.addFeatureToCharacter(characterId, fid, { training_level: 'none', value: 1 }, (errF) => {
+                      if (errF) console.warn('Erro ao adicionar habilidade de classe:', errF && errF.message);
+                      addNextCls();
+                    });
+                  };
+                  addNextCls();
+                });
+              };
+
+              doOrigin((errO) => {
+                if (errO) return callback(errO);
+                doClassAbilities((errC) => {
+                  if (errC) console.warn('Erro ao adicionar habilidades de classe:', errC && errC.message);
+                  return callback(null, result);
+                });
+              });
+            });
+          });
+        });
+      };
+
+      // populate names for class/origin if ids provided
+      if (data.classe_id) {
+        ClassModel.findById(data.classe_id, (errCl, clsRes) => {
+          if (!errCl && clsRes && clsRes.length) data.classe = clsRes[0].name;
+          if (data.origem_id) {
+            OriginModel.findById(data.origem_id, (errO, orgRes) => {
+              const org = (Array.isArray(orgRes) && orgRes.length) ? orgRes[0] : orgRes;
+              if (!errO && org) data.origem = org.name;
+              finishCreateFlow();
+            });
+          } else finishCreateFlow();
+        });
+      } else if (data.origem_id) {
+        OriginModel.findById(data.origem_id, (errO, orgRes) => {
+          const org = (Array.isArray(orgRes) && orgRes.length) ? orgRes[0] : orgRes;
+          if (!errO && org) data.origem = org.name;
+          finishCreateFlow();
+        });
+      } else {
+        finishCreateFlow();
+      }
+    } catch (e) { return callback(e); }
   },
 
   // Retorna personagem completo com cálculos de status (não persiste aqui)
@@ -414,6 +511,23 @@ const CharacterService = {
           });
         } else doComputeAndUpdate(null);
       });
+    });
+  }
+,
+
+  // retorna todos os personagens (admin/master)
+  getAllCharacters: (callback) => {
+    CharacterModel.findAll((err, results) => {
+      if (err) return callback(err);
+      return callback(null, results || []);
+    });
+  },
+
+  // retorna personagens de um usuário
+  getCharactersByUser: (userId, callback) => {
+    CharacterModel.findByUserId(userId, (err, results) => {
+      if (err) return callback(err);
+      return callback(null, results || []);
     });
   }
 };

@@ -22,7 +22,9 @@ const userRoutes = require('./routes/userRoutes');
 const layoutRoutes = require('./routes/layoutRoutes');
 
 app.use(cors());
-app.use(express.json());
+// aumentar limite de body para importações grandes (ex.: exportações de DB)
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 app.use('/characters', characterRoutes);
 app.use('/attributes', attributeRoutes);
 app.use('/features', featureRoutes);

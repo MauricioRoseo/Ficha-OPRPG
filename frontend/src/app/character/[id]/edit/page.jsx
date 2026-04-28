@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useState, useRef } from "react";
+import { createPortal } from 'react-dom';
 import { useParams, useRouter } from "next/navigation";
 import FichaPaper from "../../../../components/FichaPaper";
 import ImageModal from "../../../../components/ImageModal";
@@ -45,6 +46,19 @@ export default function CharacterEditPage() {
   const [showImageEditor, setShowImageEditor] = useState(false);
   const [imageEditorType, setImageEditorType] = useState(null); // 'perfil' | 'token'
   const [showFormulaModal, setShowFormulaModal] = useState(false);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const [showChooseTrailModal, setShowChooseTrailModal] = useState(false);
+  const [trailOptions, setTrailOptions] = useState([]);
+  const [selectedTrailId, setSelectedTrailId] = useState(null);
+  const [pendingLevelUpType, setPendingLevelUpType] = useState('level');
+  const [showChooseRitualModal, setShowChooseRitualModal] = useState(false);
+  const [ritualOptions, setRitualOptions] = useState([]);
+  const [selectedRitualId, setSelectedRitualId] = useState(null);
+  const [pendingTrailForRitual, setPendingTrailForRitual] = useState(null);
+  const [showTranscendModal, setShowTranscendModal] = useState(false);
+  const [showChooseFeatureModal, setShowChooseFeatureModal] = useState(false);
+  const [featureOptions, setFeatureOptions] = useState([]);
+  const [selectedFeatureId, setSelectedFeatureId] = useState(null);
 
   useEffect(() => {
     if (!id) return;
@@ -133,6 +147,278 @@ export default function CharacterEditPage() {
       } catch (e) {}
     })();
   }, [id]);
+
+  const applyLevelUp = async (type, extra) => {
+    if (!form) return;
+    const token = localStorage.getItem('token');
+    if (!token) { setStatus('Não autenticado'); return; }
+    setStatus('Aplicando upgrade...');
+    try {
+      const body = { type };
+      console.debug('applyLevelUp payload', { type, extra });
+      if (extra && extra.selected_trilha_id) body.selected_trilha_id = extra.selected_trilha_id;
+      if (extra && extra.selected_ritual_id) body.selected_ritual_id = extra.selected_ritual_id;
+      if (extra && extra.selected_feature_id) body.selected_feature_id = extra.selected_feature_id;
+      const res = await fetch(`http://localhost:3001/characters/${id}/levelup`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body)
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(()=>null);
+        setStatus((j && j.message) || 'Erro ao aplicar upgrade');
+        return;
+      }
+      const j = await res.json();
+      if (j && j.character) {
+        setForm(prev => ({ ...(prev||{}), nivel: j.character.nivel, nex: j.character.nex, trilha_id: j.character.trilha_id || prev.trilha_id, trilha: j.character.trilha || prev.trilha }));
+        setCharacter(prev => ({ ...(prev||{}), nivel: j.character.nivel, nex: j.character.nex, trilha_id: j.character.trilha_id || prev.trilha_id, trilha: j.character.trilha || prev.trilha }));
+      }
+      if (j && j.computed) setCharacter(prev => ({ ...(prev||{}), ...(j.computed||{}) }));
+      setStatus('Upgrade aplicado');
+    } catch (e) {
+      console.error(e);
+      setStatus('Erro de conexão');
+    } finally {
+      setShowLevelUpModal(false);
+    }
+  };
+
+  const openChooseTrailIfNeeded = async (type) => {
+    // if applying level and character will reach level 2 and has no trail yet, open selection
+    const curLevel = Number(form && form.nivel) || 0;
+    const willReach2 = (type === 'level' && curLevel < 2 && (curLevel + 1) >= 2);
+    if (!willReach2) {
+      // if not reaching level 2, but class is Ocultista, offer ritual choice before applying
+      try {
+        const clsName = (form && form.classe || '').toLowerCase();
+        if (clsName.includes('ocult')) {
+          // fetch rituals
+          const tkn = localStorage.getItem('token');
+          const rres = await fetch(`http://localhost:3001/rituals`, { headers: { Authorization: `Bearer ${tkn}` } });
+          if (!rres.ok) return applyLevelUp(type);
+          const rituals = await rres.json();
+          setRitualOptions(rituals || []);
+          setPendingLevelUpType(type);
+          setShowChooseRitualModal(true);
+          return;
+        }
+      } catch (e) { /* fallback to direct apply */ }
+      return applyLevelUp(type);
+    }
+    if (form && form.trilha_id) {
+      // already has trilha, apply directly
+      return applyLevelUp(type);
+    }
+    // fetch trails for class
+    const token = localStorage.getItem('token');
+    try {
+      const res = await fetch(`http://localhost:3001/templates/trails?classId=${form.classe_id}`, { headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) { setStatus('Erro ao carregar trilhas'); return; }
+      const trails = await res.json();
+      // fetch features to enrich ability info
+      const fRes = await fetch('http://localhost:3001/features');
+      const feats = fRes.ok ? await fRes.json() : [];
+      const enriched = (trails || []).map(t => {
+        const ability = feats ? feats.find(f => f.id === t.ability_lvl_2_id) : null;
+        return { ...t, ability };
+      });
+        setTrailOptions(enriched);
+        setPendingLevelUpType(type);
+        setShowChooseTrailModal(true);
+    } catch (e) {
+      setStatus('Erro ao carregar trilhas');
+    }
+  };
+
+  function ChooseTrailModal({ open, onClose, options, onConfirm }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[10001] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-2xl z-[10002] pointer-events-auto">
+          <h3 className="text-lg font-bold mb-3">Escolha uma trilha</h3>
+          <div className="space-y-3 max-h-[60vh] overflow-auto">
+            {(options || []).map(opt => (
+              <div key={opt.id} className={`p-3 border rounded ${selectedTrailId === opt.id ? 'border-green-500 bg-green-900/10' : 'bg-transparent'}`} onClick={() => setSelectedTrailId(opt.id)}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-semibold">{opt.name}</div>
+                    <div className="text-xs text-gray-400">{opt.description}</div>
+                  </div>
+                  <div className="text-sm text-gray-300">{opt.ability ? opt.ability.name : ''}</div>
+                </div>
+                {opt.ability && <div className="mt-2 text-sm text-gray-300">{opt.ability.description}</div>}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+              <button className="px-3 py-1 border rounded" onClick={onClose}>Cancelar</button>
+              <button className="px-3 py-2 bg-green-600 rounded" onClick={() => { if (!selectedTrailId) return setStatus('Selecione uma trilha');
+                // if character is occultist, after choosing trail allow ritual choice
+                const clsName = (form && form.classe || '').toLowerCase();
+                if (clsName.includes('ocult')) {
+                  // fetch rituals and open ritual modal, keep pending trail id
+                  (async () => {
+                    try {
+                      const tkn = localStorage.getItem('token');
+                      const rres = await fetch(`http://localhost:3001/rituals`, { headers: { Authorization: `Bearer ${tkn}` } });
+                      if (!rres.ok) { onConfirm(selectedTrailId); return; }
+                      const rituals = await rres.json();
+                        setShowChooseTrailModal(false);
+                        setRitualOptions(rituals || []);
+                        setPendingTrailForRitual(selectedTrailId);
+                        setShowChooseRitualModal(true);
+                    } catch (e) { onConfirm(selectedTrailId); }
+                  })();
+                } else onConfirm(selectedTrailId);
+              }}>Confirmar escolha</button>
+            </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  function LevelUpModal({ open, onClose, onApply }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60 z-[9999]" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md z-[10000] pointer-events-auto transition-none">
+          <h3 className="text-lg font-bold mb-3">Subir Nível — Escolha uma opção</h3>
+          <div className="space-y-3">
+            <div className="flex flex-col gap-2">
+              <button onClick={() => openChooseTrailIfNeeded('level')} className="px-3 py-2 bg-green-600 rounded">Aumentar Nível (+1)</button>
+              <div className="text-sm text-gray-400">Aumenta o nível em 1.</div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button onClick={() => { setPendingLevelUpType('nex'); setShowTranscendModal(true); }} className="px-3 py-2 bg-blue-600 rounded">Aumentar NEX (+5%)</button>
+              <div className="text-sm text-gray-400">Aumenta o NEX atual em 5%.</div>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button onClick={() => openChooseTrailIfNeeded('both')} className="px-3 py-2 bg-purple-600 rounded">Aumentar Nível e NEX</button>
+              <div className="text-sm text-gray-400">Aplica ambas as opções acima.</div>
+            </div>
+
+            <div className="flex justify-end">
+              <button onClick={onClose} className="px-3 py-1 border rounded">Cancelar</button>
+            </div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  function ChooseRitualModal({ open, onClose, options, onConfirm }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[10003] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-2xl z-[10004] pointer-events-auto">
+          <h3 className="text-lg font-bold mb-3">Escolha um ritual</h3>
+          <div className="space-y-3 max-h-[60vh] overflow-auto">
+            {(options || []).map(opt => (
+              <div key={opt.id} className={`p-3 border rounded ${selectedRitualId === opt.id ? 'border-green-500 bg-green-900/10' : 'bg-transparent'}`} onClick={() => setSelectedRitualId(opt.id)}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-semibold">{opt.name}</div>
+                    <div className="text-xs text-gray-400">{opt.description}</div>
+                  </div>
+                  <div className="text-sm text-gray-300">Círculo: {opt.circle || '-'}</div>
+                </div>
+                {opt.effect && <div className="mt-2 text-sm text-gray-300">{opt.effect}</div>}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button className="px-3 py-1 border rounded" onClick={onClose}>Cancelar</button>
+            <button className="px-3 py-2 bg-green-600 rounded" onClick={() => { if (!selectedRitualId) return setStatus('Selecione um ritual'); onConfirm(selectedRitualId); }}>Confirmar escolha</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  function ChooseFeatureModal({ open, onClose, options, onConfirm }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[10005] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-2xl z-[10006] pointer-events-auto">
+          <h3 className="text-lg font-bold mb-3">Escolha uma habilidade (Poder Paranormal)</h3>
+          <div className="space-y-3 max-h-[60vh] overflow-auto">
+            {(options || []).map(opt => (
+              <div key={opt.id} className={`p-3 border rounded ${selectedFeatureId === opt.id ? 'border-green-500 bg-green-900/10' : 'bg-transparent'}`} onClick={() => setSelectedFeatureId(opt.id)}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-semibold">{opt.name}</div>
+                    <div className="text-xs text-gray-400">{opt.description}</div>
+                  </div>
+                  <div className="text-sm text-gray-300">Origem: {opt.origin || '-'}</div>
+                </div>
+                {opt.effect && <div className="mt-2 text-sm text-gray-300">{opt.effect}</div>}
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button className="px-3 py-1 border rounded" onClick={onClose}>Cancelar</button>
+            <button className="px-3 py-2 bg-green-600 rounded" onClick={() => { if (!selectedFeatureId) return setStatus('Selecione uma habilidade'); onConfirm(selectedFeatureId); }}>Confirmar escolha</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  function TranscendModal({ open, onClose }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[10007] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md z-[10008] pointer-events-auto">
+          <h3 className="text-lg font-bold mb-3">O personagem transcendeu?</h3>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <button className="px-3 py-2 bg-gray-700 rounded" onClick={() => { setShowTranscendModal(false); onClose(); applyLevelUp('nex'); }}>Não</button>
+              <button className="px-3 py-2 bg-indigo-700 rounded" onClick={async () => {
+                // ritual path: open ritual picker
+                try {
+                  const tkn = localStorage.getItem('token');
+                  const rres = await fetch(`http://localhost:3001/rituals`, { headers: { Authorization: `Bearer ${tkn}` } });
+                  const rituals = rres.ok ? await rres.json() : [];
+                  setRitualOptions(rituals || []);
+                  setShowTranscendModal(false);
+                  setShowChooseRitualModal(true);
+                } catch (e) { setShowTranscendModal(false); applyLevelUp('nex'); }
+              }}>Com ritual</button>
+              <button className="px-3 py-2 bg-rose-700 rounded" onClick={async () => {
+                // paranormal path: fetch features filtered by origin
+                try {
+                  const tkn = localStorage.getItem('token');
+                  const fres = await fetch(`http://localhost:3001/features`, { headers: { Authorization: `Bearer ${tkn}` } });
+                  const feats = fres.ok ? await fres.json() : [];
+                  const paranormal = (feats || []).filter(f => (f.origin || '').toLowerCase().includes('poder paranormal'));
+                  setFeatureOptions(paranormal);
+                  setShowTranscendModal(false);
+                  setShowChooseFeatureModal(true);
+                } catch (e) { setShowTranscendModal(false); applyLevelUp('nex'); }
+              }}>Com poder paranormal</button>
+            </div>
+            <div className="text-sm text-gray-400">Se escolher Ritual ou Poder Paranormal, você deverá selecionar o item correspondente.</div>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
 
   // notes helpers (edit page)
   const fetchNotes = async () => {
@@ -455,9 +741,35 @@ export default function CharacterEditPage() {
               >
                 Voltar à visualização
               </button>
+              <button
+                onClick={() => setShowLevelUpModal(true)}
+                title="Subir Nível / NEX"
+                className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
+              >
+                ⬆️ Subir Nível
+              </button>
             </div>
           </div>
         </div>
+        <LevelUpModal open={showLevelUpModal} onClose={()=>setShowLevelUpModal(false)} onApply={(t)=>openChooseTrailIfNeeded(t)} />
+        <ChooseTrailModal open={showChooseTrailModal} onClose={()=>{ setShowChooseTrailModal(false); setSelectedTrailId(null); setPendingLevelUpType('level'); }} options={trailOptions} onConfirm={(trailId)=>{ setShowChooseTrailModal(false); setSelectedTrailId(null); setPendingLevelUpType('level'); applyLevelUp(pendingLevelUpType || 'level', { selected_trilha_id: trailId }); }} />
+        <ChooseRitualModal open={showChooseRitualModal} onClose={()=>{ setShowChooseRitualModal(false); setSelectedRitualId(null); setPendingTrailForRitual(null); setPendingLevelUpType('level'); }} options={ritualOptions} onConfirm={(ritualId)=>{
+          setShowChooseRitualModal(false);
+          const trailId = pendingTrailForRitual;
+          setSelectedRitualId(null);
+          setPendingTrailForRitual(null);
+          // determine type explicitly to avoid stale pendingLevelUpType
+          const typeToUse = pendingLevelUpType || (trailId ? 'level' : 'nex');
+          console.debug('ChooseRitualModal confirm, typeToUse=', typeToUse, 'trailId=', trailId);
+          applyLevelUp(typeToUse, { selected_trilha_id: trailId, selected_ritual_id: ritualId });
+        }} />
+        <ChooseFeatureModal open={showChooseFeatureModal} onClose={()=>{ setShowChooseFeatureModal(false); setSelectedFeatureId(null); setPendingLevelUpType('level'); }} options={featureOptions} onConfirm={(featureId)=>{
+          setShowChooseFeatureModal(false);
+          setSelectedFeatureId(null);
+          // apply levelUp with feature selection
+          applyLevelUp('nex', { selected_feature_id: featureId });
+        }} />
+        <TranscendModal open={showTranscendModal} onClose={()=>setShowTranscendModal(false)} />
       </div>
 
       {/* For now the edit page is a copy of the view page; later we will convert fields to editable forms */}
@@ -612,6 +924,7 @@ export default function CharacterEditPage() {
                   setShowFormulaModal(false);
                 }}
               />
+              <LevelUpModal open={showLevelUpModal} onClose={()=>setShowLevelUpModal(false)} onApply={applyLevelUp} />
               </div>
             </div>
           </div>

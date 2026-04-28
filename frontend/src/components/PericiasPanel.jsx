@@ -28,6 +28,12 @@ export default function PericiasPanel({ character, attributes, editable = false 
 
   useEffect(() => { fetchCharacterPericias(); }, [character?.id, character?.defesa_passiva]);
 
+  const shortAttr = (a) => {
+    const val = a || '-';
+    if (!val || val === '-') return '-';
+    try { return String(val).substring(0,3); } catch (e) { return String(val).slice(0,3); }
+  };
+
   const handleUseTemplate = async (template) => {
     try {
       const res = await fetch('http://localhost:3001/features/' + character.id + '/' + template.id, {
@@ -64,9 +70,9 @@ export default function PericiasPanel({ character, attributes, editable = false 
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-left text-gray-400">
-                    <th>Nome</th>
-                    <th>Atributo</th>
-                    <th className="w-28">Nível Trein.</th>
+                    <th className="w-1/2 pr-6">Nome</th>
+                    <th className="w-24 px-6">Atributo</th>
+                    <th className="w-28 px-6">Nível Trein.</th>
                     <th className="w-20">Bônus Extra</th>
                     <th className="w-24">Penal. Carga</th>
                     <th className="w-20">Total</th>
@@ -76,13 +82,13 @@ export default function PericiasPanel({ character, attributes, editable = false 
               <tbody>
                 {pericias.map(p => (
                   <tr key={p.id} className="border-t border-white/6">
-                      <td className="py-2">
+                      <td className="py-2 pr-6">
                         <div className="flex items-center gap-2">
                           <span>{p.name}</span>
                         </div>
                       </td>
-                    <td className="py-2">{p.atributo || p.metadata?.atributo || '-'}</td>
-                    <td className="py-2">{p.training_level}</td>
+                    <td className="py-2 px-6">{shortAttr(p.atributo || p.metadata?.atributo)}</td>
+                    <td className="py-2 px-6">{p.training_level}</td>
                     <td className="py-2">{p.extra ?? 0}</td>
                     <td className="py-2">{p.penalidade_carga ? (p.encumbrance_penalty ?? 0) : '-'}</td>
                     <td className="py-2">{p.total ?? ( (p.value||0) + (p.extra||0) )}</td>

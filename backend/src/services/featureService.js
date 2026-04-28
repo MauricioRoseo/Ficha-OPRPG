@@ -96,6 +96,7 @@ const FeatureService = {
 
           grouped[f.type].push({
             id: f.id,
+            template_id: f.template_id || null,
             name: f.name,
             description: f.description || '',
             atributo,

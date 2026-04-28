@@ -4,7 +4,11 @@ const CharacterModel = {
   create: (data, callback) => {
     const sql = `
       INSERT INTO characters (
-        user_id, name, idade, classe, trilha, origem, nex, nivel,
+        user_id, name, idade,
+        classe, classe_id,
+        trilha, trilha_id,
+        origem, origem_id,
+        nex, nivel,
 
         vida_atual, vida_max, vida_temp,
         sanidade_atual, sanidade_max,
@@ -12,23 +16,30 @@ const CharacterModel = {
 
         defesa_passiva, esquiva, bloqueio,
 
-        prestigio,
+        prestigio, patente,
         morrendo, enlouquecendo,
 
         deslocamento_atual, deslocamento_max,
 
         imagem_perfil, imagem_token
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const values = [
       data.user_id,
       data.name,
-      data.idade,
-      data.classe,
-      data.trilha,
-      data.origem,
+      (data.idade !== undefined ? data.idade : null),
+
+      data.classe || null,
+      (data.classe_id !== undefined ? data.classe_id : null),
+
+      data.trilha || null,
+      (data.trilha_id !== undefined ? data.trilha_id : null),
+
+      data.origem || null,
+      (data.origem_id !== undefined ? data.origem_id : null),
+
       data.nex,
       data.nivel,
 
@@ -48,7 +59,7 @@ const CharacterModel = {
       data.bloqueio || 0,
 
       data.prestigio || 0,
-        data.patente || null,
+      data.patente || null,
 
       data.morrendo || 0,
       data.enlouquecendo || 0,

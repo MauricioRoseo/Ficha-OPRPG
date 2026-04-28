@@ -17,6 +17,10 @@ router.get('/:id/patrimonio', authMiddleware, CharacterController.getPatrimonio)
 router.put('/:id', authMiddleware, CharacterController.update);
 // atualizar campos básicos/descrição/imagens do personagem
 router.put('/:id/details', authMiddleware, CharacterController.updateDetails);
+// completa a criação: o cliente envia escolhas de perícias/habilidades adicionais
+router.post('/:id/complete', authMiddleware, CharacterController.completeCreation);
+// level up endpoint: applies level/nex changes
+router.post('/:id/levelup', authMiddleware, CharacterController.levelUp);
 // atualizar/crear antecedentes (background)
 router.put('/:id/background', authMiddleware, CharacterController.updateBackground);
 // notas (character notes)
