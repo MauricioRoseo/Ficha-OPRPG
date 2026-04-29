@@ -2,6 +2,9 @@ const express = require('express');
 const cors = require('cors');
 
 require('./config/database');
+// run lightweight migrations (add missing columns if needed)
+const migrations = require('./database/migrations');
+migrations.ensureCharacterRitualsFlag();
 
 const app = express();
 const characterRoutes = require('./routes/characterRoutes');

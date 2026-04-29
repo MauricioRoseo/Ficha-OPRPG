@@ -110,6 +110,19 @@ export default function RituaisPanel({ character, attributes, editable = false }
 
   useEffect(()=>{ fetchRituais(); }, [character?.id]);
 
+  // listen for external events indicating a ritual was added elsewhere (e.g., levelUp)
+  useEffect(() => {
+    const handler = (ev) => {
+      try {
+        const cid = ev && ev.detail && ev.detail.characterId;
+        if (!cid || Number(cid) !== Number(character?.id)) return;
+        fetchRituais();
+      } catch (e) { }
+    };
+    window.addEventListener('character:ritual_added', handler);
+    return () => window.removeEventListener('character:ritual_added', handler);
+  }, [character?.id]);
+
   const searchCatalog = async (q) => {
     try {
       const res = await fetch(`http://localhost:3001/rituals/search?q=${encodeURIComponent(q)}`, { headers: { Authorization: token ? `Bearer ${token}` : '' } });

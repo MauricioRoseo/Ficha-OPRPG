@@ -59,6 +59,10 @@ export default function CharacterEditPage() {
   const [showChooseFeatureModal, setShowChooseFeatureModal] = useState(false);
   const [featureOptions, setFeatureOptions] = useState([]);
   const [selectedFeatureId, setSelectedFeatureId] = useState(null);
+  const [showChooseAfinidadeModal, setShowChooseAfinidadeModal] = useState(false);
+  const [selectedAfinidade, setSelectedAfinidade] = useState(null);
+  const [pendingLevelUpExtra, setPendingLevelUpExtra] = useState(null);
+  const [pendingTranscendAction, setPendingTranscendAction] = useState(null);
 
   useEffect(() => {
     if (!id) return;
@@ -112,6 +116,18 @@ export default function CharacterEditPage() {
           status_formula: (data.character && data.character.status_formula) ? (typeof data.character.status_formula === 'string' ? JSON.parse(data.character.status_formula) : data.character.status_formula) : null,
           defense_formula: (data.character && data.character.defense_formula) ? (typeof data.character.defense_formula === 'string' ? JSON.parse(data.character.defense_formula) : data.character.defense_formula) : null
         });
+        // if character has a class, fetch trails for that class so trilha select shows current value
+        try {
+          const classId = (data.character && data.character.classe_id) || null;
+          if (classId) {
+            const tkn2 = localStorage.getItem('token');
+            const resT = await fetch(`http://localhost:3001/templates/trails?classId=${classId}`, { headers: { Authorization: `Bearer ${tkn2}` } });
+            if (resT.ok) {
+              const trailsJson = await resT.json();
+              setTrailsList(trailsJson || []);
+            }
+          }
+        } catch (e) { /* ignore */ }
         setAttributes(data.attributes || {});
         setProtections(data.protections || []);
         setResistances(data.resistances || {});
@@ -159,20 +175,38 @@ export default function CharacterEditPage() {
       if (extra && extra.selected_trilha_id) body.selected_trilha_id = extra.selected_trilha_id;
       if (extra && extra.selected_ritual_id) body.selected_ritual_id = extra.selected_ritual_id;
       if (extra && extra.selected_feature_id) body.selected_feature_id = extra.selected_feature_id;
+      if (extra && extra.selected_afinidade) body.selected_afinidade = extra.selected_afinidade;
+      console.debug('applyLevelUp request body', body);
       const res = await fetch(`http://localhost:3001/characters/${id}/levelup`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body)
       });
+      let j = null;
+      const text = await res.text();
+      try { j = text ? JSON.parse(text) : null; } catch(e) { j = { raw: text }; }
       if (!res.ok) {
-        const j = await res.json().catch(()=>null);
-        setStatus((j && j.message) || 'Erro ao aplicar upgrade');
+        console.error('levelUp failed', res.status, j);
+        const msg = (j && j.message) || `Erro ao aplicar upgrade (${res.status})`;
+        if (String(msg).toLowerCase().includes('afinidade')) {
+          setPendingLevelUpType(type);
+          setPendingLevelUpExtra(extra || null);
+          setShowChooseAfinidadeModal(true);
+          return;
+        }
+        setStatus(msg || 'Erro ao aplicar upgrade');
         return;
       }
-      const j = await res.json();
+      console.debug('levelUp success', res.status, j);
       if (j && j.character) {
-        setForm(prev => ({ ...(prev||{}), nivel: j.character.nivel, nex: j.character.nex, trilha_id: j.character.trilha_id || prev.trilha_id, trilha: j.character.trilha || prev.trilha }));
-        setCharacter(prev => ({ ...(prev||{}), nivel: j.character.nivel, nex: j.character.nex, trilha_id: j.character.trilha_id || prev.trilha_id, trilha: j.character.trilha || prev.trilha }));
+        setForm(prev => ({ ...(prev||{}), nivel: j.character.nivel, nex: j.character.nex, trilha_id: j.character.trilha_id || prev.trilha_id, trilha: j.character.trilha || prev.trilha, afinidade: j.character.afinidade || prev.afinidade }));
+        setCharacter(prev => ({ ...(prev||{}), nivel: j.character.nivel, nex: j.character.nex, trilha_id: j.character.trilha_id || prev.trilha_id, trilha: j.character.trilha || prev.trilha, afinidade: j.character.afinidade || prev.afinidade }));
       }
       if (j && j.computed) setCharacter(prev => ({ ...(prev||{}), ...(j.computed||{}) }));
+      // if backend added a ritual during level up, notify other components
+      try {
+        if (j && j.ritual_added) {
+          window.dispatchEvent(new CustomEvent('character:ritual_added', { detail: { characterId: id } }));
+        }
+      } catch (e) {}
       setStatus('Upgrade aplicado');
     } catch (e) {
       console.error(e);
@@ -182,10 +216,68 @@ export default function CharacterEditPage() {
     }
   };
 
+  // handler when user confirms affinity choice
+  const handleConfirmAfinidade = (afinidade) => {
+    setShowChooseAfinidadeModal(false);
+    const normalized = (afinidade || '').toLowerCase();
+    const extra = Object.assign({}, pendingLevelUpExtra || {}, { selected_afinidade: normalized });
+    setPendingLevelUpExtra(null);
+    // if pendingTranscendAction indicates follow-up, perform it
+    const action = pendingTranscendAction;
+    setPendingTranscendAction(null);
+    if (action === 'ritual') {
+      (async () => {
+        try {
+          const tkn = localStorage.getItem('token');
+          const rres = await fetch(`http://localhost:3001/rituals`, { headers: { Authorization: `Bearer ${tkn}` } });
+          const rituals = rres.ok ? await rres.json() : [];
+          setRitualOptions(rituals || []);
+          setPendingLevelUpType('nex');
+          setPendingLevelUpExtra(extra);
+          setShowChooseRitualModal(true);
+        } catch (e) {
+          applyLevelUp('nex', extra);
+        }
+      })();
+      return;
+    }
+    if (action === 'feature') {
+      (async () => {
+        try {
+          const tkn = localStorage.getItem('token');
+          const fres = await fetch(`http://localhost:3001/features`, { headers: { Authorization: `Bearer ${tkn}` } });
+          const feats = fres.ok ? await fres.json() : [];
+          const paranormal = (feats || []).filter(f => (f.origin || '').toLowerCase().includes('poder paranormal'));
+          setFeatureOptions(paranormal);
+          setPendingLevelUpType('nex');
+          setPendingLevelUpExtra(extra);
+          setShowChooseFeatureModal(true);
+        } catch (e) {
+          applyLevelUp('nex', extra);
+        }
+      })();
+      return;
+    }
+    // default: just apply levelUp with affinity
+    applyLevelUp(pendingLevelUpType || 'nex', extra);
+  };
+
   const openChooseTrailIfNeeded = async (type) => {
     // if applying level and character will reach level 2 and has no trail yet, open selection
     const curLevel = Number(form && form.nivel) || 0;
     const willReach2 = (type === 'level' && curLevel < 2 && (curLevel + 1) >= 2);
+    // if applying NEX and character will cross 50 and has no afinidade, prompt before sending
+    try {
+      const curNex = Number(form && form.nex) || 0;
+      const willReach50 = (type === 'nex' && curNex < 50 && (curNex + 5) >= 50);
+      const hasAfinidade = (form && form.afinidade) || (character && character.afinidade);
+      if (willReach50 && !hasAfinidade) {
+        setPendingLevelUpType(type);
+        setPendingLevelUpExtra(null);
+        setShowChooseAfinidadeModal(true);
+        return;
+      }
+    } catch (e) { /* ignore */ }
     if (!willReach2) {
       // if not reaching level 2, but class is Ocultista, offer ritual choice before applying
       try {
@@ -204,8 +296,8 @@ export default function CharacterEditPage() {
       } catch (e) { /* fallback to direct apply */ }
       return applyLevelUp(type);
     }
-    if (form && form.trilha_id) {
-      // already has trilha, apply directly
+    if ((form && form.trilha_id) || (character && character.trilha_id)) {
+      // already has trilha on form or on loaded character — apply directly
       return applyLevelUp(type);
     }
     // fetch trails for class
@@ -377,6 +469,32 @@ export default function CharacterEditPage() {
     );
   }
 
+  function ChooseAfinidadeModal({ open, onClose, onConfirm }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    const opts = ['Morte','Sangue','Energia','Conhecimento'];
+    return createPortal(
+      <div className="fixed inset-0 z-[10009] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md z-[10010] pointer-events-auto">
+          <h3 className="text-lg font-bold mb-3">Escolha uma afinidade</h3>
+          <div className="space-y-3">
+            {opts.map(o => (
+              <div key={o} className={`p-3 border rounded ${selectedAfinidade === o ? 'border-green-500 bg-green-900/10' : 'bg-transparent'}`} onClick={() => setSelectedAfinidade(o)}>
+                <div className="font-semibold">{o}</div>
+            </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button className="px-3 py-1 border rounded" onClick={() => { setSelectedAfinidade(null); onClose(); }}>Cancelar</button>
+            <button className="px-3 py-2 bg-green-600 rounded" onClick={() => { if (!selectedAfinidade) return setStatus('Selecione uma afinidade'); onConfirm(selectedAfinidade); setSelectedAfinidade(null); }}>Confirmar escolha</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
   function TranscendModal({ open, onClose }) {
     if (!open) return null;
     if (typeof document === 'undefined') return null;
@@ -387,10 +505,36 @@ export default function CharacterEditPage() {
           <h3 className="text-lg font-bold mb-3">O personagem transcendeu?</h3>
           <div className="space-y-3">
             <div className="flex gap-2">
-              <button className="px-3 py-2 bg-gray-700 rounded" onClick={() => { setShowTranscendModal(false); onClose(); applyLevelUp('nex'); }}>Não</button>
-              <button className="px-3 py-2 bg-indigo-700 rounded" onClick={async () => {
-                // ritual path: open ritual picker
+              <button className="px-3 py-2 bg-gray-700 rounded" onClick={() => {
                 try {
+                  const curNex = Number(form && form.nex) || 0;
+                  const willReach50 = (curNex < 50 && (curNex + 5) >= 50);
+                  const hasAfinidade = (form && form.afinidade) || (character && character.afinidade);
+                  if (willReach50 && !hasAfinidade) {
+                    setPendingTranscendAction('none');
+                    setPendingLevelUpType('nex');
+                    setPendingLevelUpExtra(null);
+                    setShowChooseAfinidadeModal(true);
+                    setShowTranscendModal(false);
+                    onClose();
+                    return;
+                  }
+                } catch (e) {}
+                setShowTranscendModal(false); onClose(); applyLevelUp('nex');
+              }}>Não</button>
+              <button className="px-3 py-2 bg-indigo-700 rounded" onClick={async () => {
+                // ritual path: maybe ask affinity first, then open ritual picker
+                try {
+                  const curNex = Number(form && form.nex) || 0;
+                  const willReach50 = (curNex < 50 && (curNex + 5) >= 50);
+                  const hasAfinidade = (form && form.afinidade) || (character && character.afinidade);
+                  if (willReach50 && !hasAfinidade) {
+                    setPendingTranscendAction('ritual');
+                    setPendingLevelUpType('nex');
+                    setPendingLevelUpExtra(null);
+                    setShowChooseAfinidadeModal(true);
+                    return;
+                  }
                   const tkn = localStorage.getItem('token');
                   const rres = await fetch(`http://localhost:3001/rituals`, { headers: { Authorization: `Bearer ${tkn}` } });
                   const rituals = rres.ok ? await rres.json() : [];
@@ -400,8 +544,18 @@ export default function CharacterEditPage() {
                 } catch (e) { setShowTranscendModal(false); applyLevelUp('nex'); }
               }}>Com ritual</button>
               <button className="px-3 py-2 bg-rose-700 rounded" onClick={async () => {
-                // paranormal path: fetch features filtered by origin
+                // paranormal path: maybe ask affinity first, then open power picker
                 try {
+                  const curNex = Number(form && form.nex) || 0;
+                  const willReach50 = (curNex < 50 && (curNex + 5) >= 50);
+                  const hasAfinidade = (form && form.afinidade) || (character && character.afinidade);
+                  if (willReach50 && !hasAfinidade) {
+                    setPendingTranscendAction('feature');
+                    setPendingLevelUpType('nex');
+                    setPendingLevelUpExtra(null);
+                    setShowChooseAfinidadeModal(true);
+                    return;
+                  }
                   const tkn = localStorage.getItem('token');
                   const fres = await fetch(`http://localhost:3001/features`, { headers: { Authorization: `Bearer ${tkn}` } });
                   const feats = fres.ok ? await fres.json() : [];
@@ -411,6 +565,7 @@ export default function CharacterEditPage() {
                   setShowChooseFeatureModal(true);
                 } catch (e) { setShowTranscendModal(false); applyLevelUp('nex'); }
               }}>Com poder paranormal</button>
+              
             </div>
             <div className="text-sm text-gray-400">Se escolher Ritual ou Poder Paranormal, você deverá selecionar o item correspondente.</div>
           </div>
@@ -753,6 +908,7 @@ export default function CharacterEditPage() {
         </div>
         <LevelUpModal open={showLevelUpModal} onClose={()=>setShowLevelUpModal(false)} onApply={(t)=>openChooseTrailIfNeeded(t)} />
         <ChooseTrailModal open={showChooseTrailModal} onClose={()=>{ setShowChooseTrailModal(false); setSelectedTrailId(null); setPendingLevelUpType('level'); }} options={trailOptions} onConfirm={(trailId)=>{ setShowChooseTrailModal(false); setSelectedTrailId(null); setPendingLevelUpType('level'); applyLevelUp(pendingLevelUpType || 'level', { selected_trilha_id: trailId }); }} />
+        <ChooseAfinidadeModal open={showChooseAfinidadeModal} onClose={()=>{ setShowChooseAfinidadeModal(false); setPendingLevelUpExtra(null); }} onConfirm={handleConfirmAfinidade} />
         <ChooseRitualModal open={showChooseRitualModal} onClose={()=>{ setShowChooseRitualModal(false); setSelectedRitualId(null); setPendingTrailForRitual(null); setPendingLevelUpType('level'); }} options={ritualOptions} onConfirm={(ritualId)=>{
           setShowChooseRitualModal(false);
           const trailId = pendingTrailForRitual;
@@ -761,13 +917,17 @@ export default function CharacterEditPage() {
           // determine type explicitly to avoid stale pendingLevelUpType
           const typeToUse = pendingLevelUpType || (trailId ? 'level' : 'nex');
           console.debug('ChooseRitualModal confirm, typeToUse=', typeToUse, 'trailId=', trailId);
-          applyLevelUp(typeToUse, { selected_trilha_id: trailId, selected_ritual_id: ritualId });
+          const extra = Object.assign({}, pendingLevelUpExtra || {}, { selected_trilha_id: trailId, selected_ritual_id: ritualId });
+          setPendingLevelUpExtra(null);
+          applyLevelUp(typeToUse, extra);
         }} />
         <ChooseFeatureModal open={showChooseFeatureModal} onClose={()=>{ setShowChooseFeatureModal(false); setSelectedFeatureId(null); setPendingLevelUpType('level'); }} options={featureOptions} onConfirm={(featureId)=>{
           setShowChooseFeatureModal(false);
           setSelectedFeatureId(null);
           // apply levelUp with feature selection
-          applyLevelUp('nex', { selected_feature_id: featureId });
+          const extra = Object.assign({}, pendingLevelUpExtra || {}, { selected_feature_id: featureId });
+          setPendingLevelUpExtra(null);
+          applyLevelUp('nex', extra);
         }} />
         <TranscendModal open={showTranscendModal} onClose={()=>setShowTranscendModal(false)} />
       </div>

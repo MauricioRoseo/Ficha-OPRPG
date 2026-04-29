@@ -182,26 +182,6 @@ const CharacterController = {
         }
       });
     });
-  }
-,
-
-  // Notes CRUD
-  getNotes: (req, res) => {
-    const { id } = req.params; // character id
-    const userId = req.user.id;
-    const CharacterModel = require('../models/characterModel');
-    const CharacterNoteModel = require('../models/characterNoteModel');
-
-    CharacterModel.findById(id, (err, character) => {
-      if (err) return res.status(500).json(err);
-      if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
-      if (character.user_id !== userId) return res.status(403).json({ message: 'Acesso negado' });
-
-      CharacterNoteModel.findByCharacterId(id, (err2, notes) => {
-        if (err2) return res.status(500).json(err2);
-        res.json(notes || []);
-      });
-    });
   },
 
   getPatrimonio: (req, res) => {
@@ -313,8 +293,13 @@ CharacterController.levelUp = (req, res) => {
     const selected_trilha_id = payload.selected_trilha_id !== undefined ? payload.selected_trilha_id : null;
     let selected_trilha_name = null;
 
+    // affinity selection when crossing NEX 50
+    const selected_afinidade = payload.selected_afinidade !== undefined ? payload.selected_afinidade : null;
+
     // If leveling to 2, require trilha selection (if not already set)
     const willReachLevel2 = (curLevel < 2 && newLevel >= 2);
+    // If NEX crosses 50, require afinidade selection if character has none
+    const willReachNex50 = (curNex < 50 && newNex >= 50);
 
     const TrailModel = require('../models/trailModel');
     const FeatureModel = require('../models/featureModel');
@@ -349,11 +334,22 @@ CharacterController.levelUp = (req, res) => {
         mergedPayload.trilha = selected_trilha_name;
       }
 
+      // if user provided afinidade selection, validate and persist it
+      if (selected_afinidade) {
+        const allowed = ['morte','sangue','energia','conhecimento'];
+        const given = (String(selected_afinidade || '').trim()).toLowerCase();
+        if (!allowed.includes(given)) return res.status(400).json({ message: 'Afinidade inválida' });
+        mergedPayload.afinidade = given.charAt(0).toUpperCase() + given.slice(1);
+      }
+
       CharacterModel.updateDetails(id, mergedPayload, (err2) => {
         if (err2) return res.status(500).json(err2);
         // after updating details, if we need to add lvl2 ability from trail
         const maybeAddTrailAbility = (next) => {
+          // Only add trail lvl2 ability when the character is actually reaching level 2
+          // (i.e., this levelUp operation increases level to 2). Do not add when only NEX is increased.
           if (!mergedPayload.trilha_id) return next();
+          if (!willReachLevel2) return next();
           TrailModel.findByClassId(mergedPayload.classe_id, (errT, trails) => {
             if (errT) return res.status(500).json(errT);
             const found = (trails || []).find(t => t.id === Number(mergedPayload.trilha_id));
@@ -384,13 +380,32 @@ CharacterController.levelUp = (req, res) => {
         };
 
         const maybeAddRitual = (next) => {
-          const selected_ritual_id = payload.selected_ritual_id !== undefined ? payload.selected_ritual_id : null;
+          console.log('[levelUp] maybeAddRitual invoked with payload selected_ritual_id=', payload.selected_ritual_id);
+          // support either a single selected_ritual_id or an array selected_ritual_ids
+          let selected_ritual_id = payload.selected_ritual_id !== undefined ? payload.selected_ritual_id : null;
+          if (!selected_ritual_id && Array.isArray(payload.selected_ritual_ids) && payload.selected_ritual_ids.length) selected_ritual_id = payload.selected_ritual_ids[0];
+          // coerce to number when possible
+          if (selected_ritual_id !== null) selected_ritual_id = Number(selected_ritual_id) || null;
           if (!selected_ritual_id) return next();
           // only allow for Ocultista class (by name contains 'ocult')
+          let grantedByLevel = false;
           try {
-            const clsName = (character.classe || '').toLowerCase();
-            if (!clsName.includes('ocult')) return next();
-          } catch (e) { return next(); }
+            // prefer mergedPayload.class (updated value) but fallback to existing character
+            const clsToCheck = (mergedPayload && mergedPayload.classe) ? mergedPayload.classe : (character && character.classe) || '';
+            const clsName = (clsToCheck || '').toLowerCase();
+            // determine whether ritual should be 'free' (granted by level) — occultistas gain ritual on level-ups
+            const isOccult = clsName.includes('ocult');
+            const isLevelIncrease = (newLevel > curLevel);
+            grantedByLevel = isOccult && isLevelIncrease; // free ritual when occultista and leveling
+            // allow adding ritual if it's a NEX transcension (type === 'nex') OR if grantedByLevel
+            if (!grantedByLevel && type !== 'nex') {
+              console.log('[levelUp] maybeAddRitual skipped — not a NEX change and not grantedByLevel', { type, grantedByLevel, clsToCheck });
+              return next();
+            }
+          } catch (e) {
+            console.log('[levelUp] maybeAddRitual skipped — error checking class', e && e.message);
+            return next();
+          }
 
           const AttributeModel = require('../models/attributeModel');
           const RitualModel = require('../models/ritualModel');
@@ -404,7 +419,7 @@ CharacterController.levelUp = (req, res) => {
             const limite_rituais_default = Number(attrs.intelecto || 1);
 
             // ensure ritual exists
-            console.debug('[levelUp] attempting to add ritual', { characterId: id, selected_ritual_id, dt_resistencia_default, limite_rituais_default });
+            console.log('[levelUp] attempting to add ritual', { characterId: id, selected_ritual_id, dt_resistencia_default, limite_rituais_default });
             RitualModel.findById(selected_ritual_id, (errR, ritualRow) => {
               if (errR) {
                 console.error('[levelUp] error finding ritual:', errR);
@@ -415,16 +430,86 @@ CharacterController.levelUp = (req, res) => {
                 return next();
               }
               const circle = (ritualRow && (ritualRow.circle || ritualRow.circle === 0)) ? ritualRow.circle : null;
-              console.debug('[levelUp] ritual row', ritualRow);
-              CharacterRitualModel.addFromCatalog(id, selected_ritual_id, { dt_resistencia: dt_resistencia_default, circulo: circle, limite_rituais: limite_rituais_default }, (errCR, resultCR) => {
-                if (errCR) {
-                  console.warn('Erro ao adicionar ritual selecionado no levelUp:', errCR && errCR.message);
-                } else {
-                  console.debug('[levelUp] addFromCatalog result', resultCR);
-                  _ritualAdded = true;
-                }
-                return next();
-              });
+              console.log('[levelUp] ritual row', ritualRow);
+              const proceedAdd = () => {
+                // try addFromCatalog first — pass granted_by_level flag
+                CharacterRitualModel.addFromCatalog(id, selected_ritual_id, { dt_resistencia: dt_resistencia_default, circulo: circle, limite_rituais: limite_rituais_default, granted_by_level: grantedByLevel }, (errCR, resultCR) => {
+                  if (errCR) {
+                    console.warn('Erro ao adicionar ritual selecionado no levelUp (addFromCatalog):', errCR && errCR.message);
+                  } else {
+                    // treat any successful response (no error) as insertion success — more robust across drivers
+                    console.log('[levelUp] addFromCatalog callback OK', resultCR && (resultCR.insertId || resultCR.affectedRows));
+                    _ritualAdded = true;
+                    return next();
+                  }
+
+                  // fallback: create a custom snapshot using ritualRow fields
+                  try {
+                    const customPayload = {
+                      name: ritualRow.name || null,
+                      element: ritualRow.element || null,
+                      description: ritualRow.description || ritualRow.effect || null,
+                      execution: ritualRow.execution || null,
+                      alcance: ritualRow.alcance || null,
+                      alvo: ritualRow.alvo || null,
+                      duration: ritualRow.duration || null,
+                      resistencia_pericia_id: ritualRow.resistencia_pericia_id || null,
+                      resistencia_pericia_name: null,
+                      aprimoramento_discente: ritualRow.aprimoramento_discente || 0,
+                      custo_aprimoramento_discente: ritualRow.custo_aprimoramento_discente || null,
+                      descricao_aprimoramento_discente: ritualRow.descricao_aprimoramento_discente || null,
+                      aprimoramento_verdadeiro: ritualRow.aprimoramento_verdadeiro || 0,
+                      custo_aprimoramento_verdadeiro: ritualRow.custo_aprimoramento_verdadeiro || null,
+                      descricao_aprimoramento_verdadeiro: ritualRow.descricao_aprimoramento_verdadeiro || null,
+                      symbol_image: ritualRow.symbol_image || ritualRow.symbol || null,
+                      symbol_image_secondary: ritualRow.symbol_image_secondary || ritualRow.symbol2 || null,
+                      dt_resistencia: dt_resistencia_default,
+                      limite_rituais: limite_rituais_default,
+                      circulo: circle
+                    };
+                    CharacterRitualModel.createCustom(id, customPayload, (errC, resC) => {
+                      if (errC) {
+                        console.warn('Erro ao criar ritual customizado como fallback:', errC && errC.message);
+                      } else {
+                        console.log('[levelUp] createCustom fallback succeeded', resC && (resC.insertId || resC.affectedRows));
+                        _ritualAdded = true;
+                      }
+                      return next();
+                    });
+                  } catch (e2) {
+                    console.error('[levelUp] fallback createCustom exception', e2 && e2.message);
+                    return next();
+                  }
+                });
+              };
+
+              // If ritual is not a grantedByLevel (i.e., regular NEX learned ritual), enforce limit
+              if (!grantedByLevel) {
+                const CharacterRitualModel = require('../models/characterRitualModel');
+                CharacterRitualModel.getByCharacter(id, (errList, existingR) => {
+                  if (errList) {
+                    console.warn('[levelUp] could not fetch existing rituals to enforce limit:', errList && errList.message);
+                    return proceedAdd();
+                  }
+                  // count only rituals that are not granted by level
+                  const counted = (existingR || []).filter(r => !r.granted_by_level).length;
+                  if (Number(counted) >= Number(limite_rituais_default)) {
+                    console.log('[levelUp] ritual not added — character reached ritual limit', { counted, limite_rituais_default });
+                    return next();
+                  }
+                  return proceedAdd();
+                });
+              } else {
+                // granted by level — proceed without limit check
+                CharacterRitualModel.addFromCatalog(id, selected_ritual_id, { dt_resistencia: dt_resistencia_default, circulo: circle, limite_rituais: limite_rituais_default, granted_by_level: grantedByLevel }, (errCR2, resultCR2) => {
+                  if (errCR2) console.warn('Erro ao adicionar ritual por nivel (addFromCatalog):', errCR2 && errCR2.message);
+                  else {
+                    console.log('[levelUp] addFromCatalog (granted_by_level) OK', resultCR2 && (resultCR2.insertId || resultCR2.affectedRows));
+                    _ritualAdded = true;
+                  }
+                  return next();
+                });
+              }
             });
           });
         };
@@ -433,13 +518,45 @@ CharacterController.levelUp = (req, res) => {
           const CharacterService = require('../services/characterService');
           CharacterService.recalculateStatusMax(id, (err3, stats) => {
             if (err3) return res.status(500).json(err3);
-            return res.json({ message: 'Level up aplicado', character: { nivel: newLevel, nex: newNex, trilha_id: mergedPayload.trilha_id, trilha: mergedPayload.trilha }, computed: stats, ritual_added: !!_ritualAdded });
+            return res.json({ message: 'Level up aplicado', character: { nivel: newLevel, nex: newNex, trilha_id: mergedPayload.trilha_id, trilha: mergedPayload.trilha, afinidade: mergedPayload.afinidade || character.afinidade }, computed: stats, ritual_added: !!_ritualAdded });
           });
         };
 
         // Run trail ability addition first, then always attempt to add ritual, then recalc
+        const maybeAddFeature = (nextFeature) => {
+          // handle selected_feature_id or array selected_feature_ids
+          let selFeat = payload.selected_feature_id !== undefined ? payload.selected_feature_id : null;
+          if (!selFeat && Array.isArray(payload.selected_feature_ids) && payload.selected_feature_ids.length) selFeat = payload.selected_feature_ids[0];
+          if (!selFeat) return nextFeature();
+          // normalize to array
+          const featsToAdd = Array.isArray(selFeat) ? selFeat.map(Number) : [Number(selFeat)];
+          const FeatureModel = require('../models/featureModel');
+          const FeatureService = require('../services/featureService');
+          // fetch existing template_ids to avoid duplicates
+          FeatureModel.getByCharacter(id, (errF, existing) => {
+            if (errF) {
+              console.warn('[levelUp] could not fetch existing features to avoid duplicates:', errF && errF.message);
+              return nextFeature();
+            }
+            const existingTemplateIds = (existing || []).map(e => e.template_id).filter(Boolean).map(Number);
+            const toAdd = featsToAdd.filter(f => f && !existingTemplateIds.includes(Number(f)));
+            if (!toAdd.length) return nextFeature();
+            const addNextFeat = (i) => {
+              if (i >= toAdd.length) return nextFeature();
+              const fid = Number(toAdd[i]);
+              FeatureService.addFeatureToCharacter(Number(id), fid, { training_level: 'trained', value: 1 }, (errAdd) => {
+                if (errAdd) console.warn('[levelUp] erro ao adicionar feature selecionada:', errAdd && errAdd.message);
+                addNextFeat(i+1);
+              });
+            };
+            addNextFeat(0);
+          });
+        };
+
         maybeAddTrailAbility(() => {
-          maybeAddRitual(() => callbackRecalc());
+          maybeAddFeature(() => {
+            maybeAddRitual(() => callbackRecalc());
+          });
         });
       });
     };
@@ -447,6 +564,11 @@ CharacterController.levelUp = (req, res) => {
     // If leveling to 2 and character has no trilha yet, require selection
     if (willReachLevel2 && (!character.trilha_id && !selected_trilha_id)) {
       return res.status(400).json({ message: 'Seleção de trilha necessária ao atingir nível 2' });
+    }
+
+    // If crossing NEX 50 and character has no afinidade, require selection
+    if (willReachNex50 && (!character.afinidade && !selected_afinidade)) {
+      return res.status(400).json({ message: 'Seleção de afinidade necessária ao atingir NEX 50' });
     }
 
     // If selected_trilha_id provided, validate it belongs to character's class

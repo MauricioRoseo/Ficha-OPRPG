@@ -5,20 +5,21 @@ const CharacterRitualModel = {
   addFromCatalog: (characterId, ritualId, data, callback) => {
     const sql = `
       INSERT INTO character_rituals
-      (character_id, ritual_catalog_id, dt_resistencia, circulo, limite_rituais, snapshot_name, snapshot_element, snapshot_description, snapshot_execution, snapshot_alcance, snapshot_alvo, snapshot_duration, snapshot_resistencia_pericia_id, snapshot_resistencia_pericia_name, snapshot_aprimoramento_discente, snapshot_custo_aprimoramento_discente, snapshot_descricao_aprimoramento_discente, snapshot_aprimoramento_verdadeiro, snapshot_custo_aprimoramento_verdadeiro, snapshot_descricao_aprimoramento_verdadeiro, snapshot_symbol, snapshot_symbol_secondary, created_at)
-      SELECT ?, id, ?, ?, ?, name, element, description, execution, alcance, alvo, duration, resistencia_pericia_id, (SELECT name FROM features WHERE id = rituals_catalog.resistencia_pericia_id LIMIT 1), aprimoramento_discente, custo_aprimoramento_discente, descricao_aprimoramento_discente, aprimoramento_verdadeiro, custo_aprimoramento_verdadeiro, descricao_aprimoramento_verdadeiro, symbol_image, symbol_image_secondary, NOW() FROM rituals_catalog WHERE id = ?
+      (character_id, ritual_catalog_id, dt_resistencia, circulo, limite_rituais, granted_by_level, snapshot_name, snapshot_element, snapshot_description, snapshot_execution, snapshot_alcance, snapshot_alvo, snapshot_duration, snapshot_resistencia_pericia_id, snapshot_resistencia_pericia_name, snapshot_aprimoramento_discente, snapshot_custo_aprimoramento_discente, snapshot_descricao_aprimoramento_discente, snapshot_aprimoramento_verdadeiro, snapshot_custo_aprimoramento_verdadeiro, snapshot_descricao_aprimoramento_verdadeiro, snapshot_symbol, snapshot_symbol_secondary, created_at)
+      SELECT ?, id, ?, ?, ?, ?, name, element, description, execution, alcance, alvo, duration, resistencia_pericia_id, (SELECT name FROM features WHERE id = rituals_catalog.resistencia_pericia_id LIMIT 1), aprimoramento_discente, custo_aprimoramento_discente, descricao_aprimoramento_discente, aprimoramento_verdadeiro, custo_aprimoramento_verdadeiro, descricao_aprimoramento_verdadeiro, symbol_image, symbol_image_secondary, NOW() FROM rituals_catalog WHERE id = ?
     `;
     const values = [
       characterId,
       data.dt_resistencia || null,
       data.circulo || null,
       data.limite_rituais || null,
+      data.granted_by_level ? 1 : 0,
       ritualId
     ];
-    console.debug('[CharacterRitualModel.addFromCatalog] sql values:', values);
+    console.log('[CharacterRitualModel.addFromCatalog] sql values:', values);
     db.query(sql, values, (err, result) => {
       if (err) console.error('[CharacterRitualModel.addFromCatalog] error:', err && err.message);
-      else console.debug('[CharacterRitualModel.addFromCatalog] result:', result && result.insertId);
+      else console.log('[CharacterRitualModel.addFromCatalog] result:', result && (result.insertId || result.affectedRows));
       if (typeof callback === 'function') callback(err, result);
     });
   },
@@ -27,7 +28,7 @@ const CharacterRitualModel = {
   createCustom: (characterId, data, callback) => {
     const sql = `
       INSERT INTO character_rituals
-      (character_id, ritual_catalog_id, dt_resistencia, circulo, limite_rituais, snapshot_name, snapshot_element, snapshot_description, snapshot_execution, snapshot_alcance, snapshot_alvo, snapshot_duration, snapshot_resistencia_pericia_id, snapshot_resistencia_pericia_name, snapshot_aprimoramento_discente, snapshot_custo_aprimoramento_discente, snapshot_descricao_aprimoramento_discente, snapshot_aprimoramento_verdadeiro, snapshot_custo_aprimoramento_verdadeiro, snapshot_descricao_aprimoramento_verdadeiro, snapshot_symbol, snapshot_symbol_secondary, created_at)
+      (character_id, ritual_catalog_id, dt_resistencia, circulo, limite_rituais, granted_by_level, snapshot_name, snapshot_element, snapshot_description, snapshot_execution, snapshot_alcance, snapshot_alvo, snapshot_duration, snapshot_resistencia_pericia_id, snapshot_resistencia_pericia_name, snapshot_aprimoramento_discente, snapshot_custo_aprimoramento_discente, snapshot_descricao_aprimoramento_discente, snapshot_aprimoramento_verdadeiro, snapshot_custo_aprimoramento_verdadeiro, snapshot_descricao_aprimoramento_verdadeiro, snapshot_symbol, snapshot_symbol_secondary, created_at)
       VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
     const values = [
@@ -35,6 +36,7 @@ const CharacterRitualModel = {
       data.dt_resistencia || null,
       data.circulo || null,
       data.limite_rituais || null,
+      data.granted_by_level ? 1 : 0,
       data.name || null,
       data.element || null,
       data.description || null,
