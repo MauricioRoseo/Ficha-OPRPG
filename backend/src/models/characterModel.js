@@ -2,29 +2,28 @@ const db = require('../config/database');
 
 const CharacterModel = {
   create: (data, callback) => {
-    const sql = `
-      INSERT INTO characters (
-        user_id, name, idade,
-        classe, classe_id,
-        trilha, trilha_id,
-        origem, origem_id,
-        nex, nivel,
+    const columns = `user_id, name, idade,
+      classe, classe_id,
+      trilha, trilha_id,
+      origem, origem_id,
+      nex, nivel,
 
-        vida_atual, vida_max, vida_temp,
-        sanidade_atual, sanidade_max,
-        esforco_atual, esforco_max, esforco_temp,
+      vida_atual, vida_max, vida_temp,
+      sanidade_atual, sanidade_max,
+      esforco_atual, esforco_max, esforco_temp,
 
-        defesa_passiva, esquiva, bloqueio,
+      defesa_passiva, esquiva, bloqueio,
 
-        prestigio, patente,
-        morrendo, enlouquecendo,
+      prestigio, patente,
+      morrendo, enlouquecendo,
 
-        deslocamento_atual, deslocamento_max,
+      deslocamento_atual, deslocamento_max,
 
-        imagem_perfil, imagem_token
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+      imagem_perfil, imagem_token,
+      proficiencias`;
+
+    const placeholders = new Array(31).fill('?').join(', ');
+    const sql = `INSERT INTO characters (${columns}) VALUES (${placeholders})`;
 
     const values = [
       data.user_id,
@@ -68,7 +67,8 @@ const CharacterModel = {
       data.deslocamento_max || 0,
 
       data.imagem_perfil || null,
-      data.imagem_token || null
+      data.imagem_token || null,
+      data.proficiencias || null
     ];
 
     db.query(sql, values, callback);

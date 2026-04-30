@@ -59,10 +59,24 @@ export default function CharacterEditPage() {
   const [showChooseFeatureModal, setShowChooseFeatureModal] = useState(false);
   const [featureOptions, setFeatureOptions] = useState([]);
   const [selectedFeatureId, setSelectedFeatureId] = useState(null);
+  const [showChooseAttributeModal, setShowChooseAttributeModal] = useState(false);
+  const [selectedAttributeForLevelUp, setSelectedAttributeForLevelUp] = useState(null);
+  const [showChooseTrainingModal, setShowChooseTrainingModal] = useState(false);
+  const [trainingOptions, setTrainingOptions] = useState([]);
+  const [trainingAllowedCount, setTrainingAllowedCount] = useState(0);
+  const [selectedTrainingIds, setSelectedTrainingIds] = useState([]);
   const [showChooseAfinidadeModal, setShowChooseAfinidadeModal] = useState(false);
   const [selectedAfinidade, setSelectedAfinidade] = useState(null);
   const [pendingLevelUpExtra, setPendingLevelUpExtra] = useState(null);
   const [pendingTranscendAction, setPendingTranscendAction] = useState(null);
+
+  useEffect(() => {
+    if (showChooseFeatureModal) {
+      try { console.warn('showChooseFeatureModal state became true'); window.__chooseFeatureModalState = true; } catch(e) {}
+    } else {
+      try { window.__chooseFeatureModalState = false; } catch(e) {}
+    }
+  }, [showChooseFeatureModal]);
 
   useEffect(() => {
     if (!id) return;
@@ -176,6 +190,8 @@ export default function CharacterEditPage() {
       if (extra && extra.selected_ritual_id) body.selected_ritual_id = extra.selected_ritual_id;
       if (extra && extra.selected_feature_id) body.selected_feature_id = extra.selected_feature_id;
       if (extra && extra.selected_afinidade) body.selected_afinidade = extra.selected_afinidade;
+      if (extra && extra.selected_attribute) body.selected_attribute = extra.selected_attribute;
+      if (extra && extra.selected_training_feature_ids) body.selected_training_feature_ids = extra.selected_training_feature_ids;
       console.debug('applyLevelUp request body', body);
       const res = await fetch(`http://localhost:3001/characters/${id}/levelup`, {
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body)
@@ -184,12 +200,81 @@ export default function CharacterEditPage() {
       const text = await res.text();
       try { j = text ? JSON.parse(text) : null; } catch(e) { j = { raw: text }; }
       if (!res.ok) {
-        console.error('levelUp failed', res.status, j);
+        console.warn('levelUp failed', res.status, j);
         const msg = (j && j.message) || `Erro ao aplicar upgrade (${res.status})`;
+        console.warn('levelUp response raw', { text: text, parsed: j });
+        // affinity required flow
         if (String(msg).toLowerCase().includes('afinidade')) {
           setPendingLevelUpType(type);
           setPendingLevelUpExtra(extra || null);
+          setStatus('');
           setShowChooseAfinidadeModal(true);
+          return;
+        }
+        // feature selection required (allowed_origins supplied by backend)
+        // Handle feature selection requirement more leniently: backend should return { required: true, allowed_origins: [...] }
+        const looksLikeFeatureRequirement = (j && Array.isArray(j.allowed_origins) && j.allowed_origins.length > 0) || (String(text || '').toLowerCase().includes('seleção de poder')) || (String(msg || '').toLowerCase().includes('seleção de poder'));
+        console.warn('feature requirement detected?', { looksLikeFeatureRequirement, parsed: j, textSnippet: (text||'').slice(0,200) });
+        if (looksLikeFeatureRequirement) {
+          // If this level-up already included a selected attribute, do not prompt for a feature.
+          const skipFeatureModalBecauseAttribute = (extra && extra.selected_attribute) || (pendingLevelUpExtra && pendingLevelUpExtra.selected_attribute);
+          if (skipFeatureModalBecauseAttribute) {
+            setStatus(msg || '');
+            return;
+          }
+          setPendingLevelUpType(type);
+          setPendingLevelUpExtra(extra || null);
+          try {
+            const tkn = localStorage.getItem('token');
+            let combined = [];
+            if (j && Array.isArray(j.allowed_origins) && j.allowed_origins.length) {
+              const origins = (j.allowed_origins || []).map(o => encodeURIComponent(String(o || '')));
+              const promises = origins.map(o => fetch(`http://localhost:3001/features/search?origin=${o}`, { headers: { Authorization: `Bearer ${tkn}` } }).then(r => r.ok ? r.json() : []).catch(() => []));
+              const results = await Promise.all(promises);
+              combined = [].concat(...results);
+            } else {
+              // fallback: fetch all features and show those with 'poder' in origin or 'Poder' in name
+              const fres = await fetch(`http://localhost:3001/features`, { headers: { Authorization: `Bearer ${tkn}` } });
+              const feats = fres.ok ? await fres.json() : [];
+              combined = (feats || []).filter(f => (f.origin || '').toString().toLowerCase().includes('poder') || (f.name || '').toString().toLowerCase().includes('poder'));
+            }
+            const seen = new Set();
+            const filtered = (combined || []).filter(f => { if (!f || !f.id) return false; if (seen.has(f.id)) return false; seen.add(f.id); return true; });
+            console.warn('opening ChooseFeatureModal with options count', filtered.length);
+            setFeatureOptions(filtered);
+          } catch (e) {
+            console.warn('Erro ao carregar opções de poderes', e);
+            setFeatureOptions([]);
+          }
+          setStatus('');
+          setShowChooseFeatureModal(true);
+          return;
+        }
+        // training-grade selection required
+        if (j && j.training) {
+          // If this request already included training selections, don't reopen modal.
+          const skipTrainingModalBecauseSent = (extra && Array.isArray(extra.selected_training_feature_ids) && extra.selected_training_feature_ids.length) || (pendingLevelUpExtra && Array.isArray(pendingLevelUpExtra.selected_training_feature_ids) && pendingLevelUpExtra.selected_training_feature_ids.length);
+          if (skipTrainingModalBecauseSent) {
+            setStatus(msg || '');
+            return;
+          }
+          setPendingLevelUpType(type);
+          setPendingLevelUpExtra(extra || null);
+          try {
+            const tkn = localStorage.getItem('token');
+            // fetch character features grouped (pericias only)
+            const fres = await fetch(`http://localhost:3001/features/character/${id}`, { headers: { Authorization: `Bearer ${tkn}` } });
+            const feats = fres.ok ? await fres.json() : {};
+            const pericias = (feats && feats.pericia) ? feats.pericia : [];
+            setTrainingOptions(pericias || []);
+            setTrainingAllowedCount(j.allowed_count || 0);
+          } catch (e) {
+            console.warn('Erro ao carregar perícias para treinamento', e);
+            setTrainingOptions([]);
+            setTrainingAllowedCount(0);
+          }
+          setStatus('');
+          setShowChooseTrainingModal(true);
           return;
         }
         setStatus(msg || 'Erro ao aplicar upgrade');
@@ -265,6 +350,15 @@ export default function CharacterEditPage() {
   const openChooseTrailIfNeeded = async (type) => {
     // if applying level and character will reach level 2 and has no trail yet, open selection
     const curLevel = Number(form && form.nivel) || 0;
+    // special attribute-increase levels
+    const SPECIAL_ATTR_LEVELS = [4,10,16,19];
+    const willReachSpecialAttr = (type === 'level' && SPECIAL_ATTR_LEVELS.includes(curLevel + 1));
+    if (willReachSpecialAttr) {
+      setPendingLevelUpType(type);
+      setPendingLevelUpExtra(null);
+      setShowChooseAttributeModal(true);
+      return;
+    }
     const willReach2 = (type === 'level' && curLevel < 2 && (curLevel + 1) >= 2);
     // if applying NEX and character will cross 50 and has no afinidade, prompt before sending
     try {
@@ -374,26 +468,36 @@ export default function CharacterEditPage() {
   function LevelUpModal({ open, onClose, onApply }) {
     if (!open) return null;
     if (typeof document === 'undefined') return null;
+    const curNex = Number(form && form.nex) || 0;
+    const curLevel = Number(form && form.nivel) || 0;
+    const disableNexOptions = curNex >= 99;
+    const disableLevelOptions = curLevel >= 20;
     return createPortal(
       <div className="fixed inset-0 z-[9999] flex items-center justify-center">
         <div className="absolute inset-0 bg-black/60 z-[9999]" onClick={onClose} />
         <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md z-[10000] pointer-events-auto transition-none">
           <h3 className="text-lg font-bold mb-3">Subir Nível — Escolha uma opção</h3>
           <div className="space-y-3">
-            <div className="flex flex-col gap-2">
-              <button onClick={() => openChooseTrailIfNeeded('level')} className="px-3 py-2 bg-green-600 rounded">Aumentar Nível (+1)</button>
-              <div className="text-sm text-gray-400">Aumenta o nível em 1.</div>
-            </div>
+            {!disableLevelOptions && (
+              <div className="flex flex-col gap-2">
+                <button onClick={() => openChooseTrailIfNeeded('level')} className="px-3 py-2 bg-green-600 rounded">Aumentar Nível (+1)</button>
+                <div className="text-sm text-gray-400">Aumenta o nível em 1.</div>
+              </div>
+            )}
 
-            <div className="flex flex-col gap-2">
-              <button onClick={() => { setPendingLevelUpType('nex'); setShowTranscendModal(true); }} className="px-3 py-2 bg-blue-600 rounded">Aumentar NEX (+5%)</button>
-              <div className="text-sm text-gray-400">Aumenta o NEX atual em 5%.</div>
-            </div>
+            {!disableNexOptions && (
+              <div className="flex flex-col gap-2">
+                <button onClick={() => { setPendingLevelUpType('nex'); setShowTranscendModal(true); }} className="px-3 py-2 bg-blue-600 rounded">Aumentar NEX (+5%)</button>
+                <div className="text-sm text-gray-400">Aumenta o NEX atual em 5%.</div>
+              </div>
+            )}
 
-            <div className="flex flex-col gap-2">
-              <button onClick={() => openChooseTrailIfNeeded('both')} className="px-3 py-2 bg-purple-600 rounded">Aumentar Nível e NEX</button>
-              <div className="text-sm text-gray-400">Aplica ambas as opções acima.</div>
-            </div>
+            {(!disableLevelOptions && !disableNexOptions) && (
+              <div className="flex flex-col gap-2">
+                <button onClick={() => openChooseTrailIfNeeded('both')} className="px-3 py-2 bg-purple-600 rounded">Aumentar Nível e NEX</button>
+                <div className="text-sm text-gray-400">Aplica ambas as opções acima.</div>
+              </div>
+            )}
 
             <div className="flex justify-end">
               <button onClick={onClose} className="px-3 py-1 border rounded">Cancelar</button>
@@ -439,9 +543,11 @@ export default function CharacterEditPage() {
 
   function ChooseFeatureModal({ open, onClose, options, onConfirm }) {
     if (!open) return null;
+    try { console.warn('ChooseFeatureModal render', { open: !!open, optionsCount: (options||[]).length }); window.__chooseFeatureModalRendered = true; } catch(e) {}
     if (typeof document === 'undefined') return null;
     return createPortal(
       <div className="fixed inset-0 z-[10005] flex items-center justify-center">
+        <div style={{position:'fixed', top:12, right:12, zIndex:100000, background:'#ff4d4d', color:'#fff', padding:'6px 8px', borderRadius:6, fontSize:12}}>DEBUG: ChooseFeatureModal</div>
         <div className="absolute inset-0 bg-black/60" onClick={onClose} />
         <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-2xl z-[10006] pointer-events-auto">
           <h3 className="text-lg font-bold mb-3">Escolha uma habilidade (Poder Paranormal)</h3>
@@ -488,6 +594,68 @@ export default function CharacterEditPage() {
           <div className="flex justify-end gap-2 mt-4">
             <button className="px-3 py-1 border rounded" onClick={() => { setSelectedAfinidade(null); onClose(); }}>Cancelar</button>
             <button className="px-3 py-2 bg-green-600 rounded" onClick={() => { if (!selectedAfinidade) return setStatus('Selecione uma afinidade'); onConfirm(selectedAfinidade); setSelectedAfinidade(null); }}>Confirmar escolha</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  function ChooseAttributeModal({ open, onClose, onConfirm }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    const opts = [
+      { key: 'forca', label: 'Força' },
+      { key: 'agilidade', label: 'Agilidade' },
+      { key: 'intelecto', label: 'Intelecto' },
+      { key: 'vigor', label: 'Vigor' },
+      { key: 'presenca', label: 'Presença' }
+    ];
+    return createPortal(
+      <div className="fixed inset-0 z-[10011] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md z-[10012] pointer-events-auto">
+          <h3 className="text-lg font-bold mb-3">Escolha um atributo para aumentar (+1)</h3>
+          <div className="space-y-3">
+            {opts.map(o => (
+              <div key={o.key} className={`p-3 border rounded ${selectedAttributeForLevelUp === o.key ? 'border-green-500 bg-green-900/10' : 'bg-transparent'}`} onClick={() => setSelectedAttributeForLevelUp(o.key)}>
+                <div className="font-semibold">{o.label}</div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button className="px-3 py-1 border rounded" onClick={() => { setSelectedAttributeForLevelUp(null); onClose(); }}>Cancelar</button>
+            <button className="px-3 py-2 bg-green-600 rounded" onClick={() => { if (!selectedAttributeForLevelUp) return setStatus('Selecione um atributo'); onConfirm(selectedAttributeForLevelUp); }}>Confirmar escolha</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  function ChooseTrainingModal({ open, onClose, options, allowedCount, selectedIds, onToggle, onConfirm }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[10013] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-3xl z-[10014] pointer-events-auto">
+          <h3 className="text-lg font-bold mb-3">Grau de Treinamento — Escolha até {allowedCount} perícias</h3>
+          <div className="space-y-3 max-h-[60vh] overflow-auto">
+            {(options || []).map(opt => (
+              <div key={opt.id} className={`p-3 border rounded ${selectedIds && selectedIds.includes(opt.id) ? 'border-green-500 bg-green-900/10' : 'bg-transparent'}`} onClick={() => onToggle(opt.id)}>
+                <div className="flex justify-between items-center">
+                  <div>
+                    <div className="font-semibold">{opt.name}</div>
+                    <div className="text-xs text-gray-400">Treinamento atual: {opt.training_level}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-end gap-2 mt-4">
+            <button className="px-3 py-1 border rounded" onClick={() => { setSelectedTrainingIds([]); onClose(); }}>Cancelar</button>
+            <button className="px-3 py-2 bg-green-600 rounded" onClick={onConfirm}>Confirmar escolha</button>
           </div>
         </div>
       </div>,
@@ -890,20 +1058,20 @@ export default function CharacterEditPage() {
 
           <div>
             <div className="flex gap-2">
-                <button
-                onClick={() => router.push(currentUserRole === 'master' || currentUserRole === 'admin' ? '/master/pdj' : `/character/${id}`)}
-                className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
-              >
-                Voltar à visualização
-              </button>
-              <button
-                onClick={() => setShowLevelUpModal(true)}
-                title="Subir Nível / NEX"
-                className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
-              >
-                ⬆️ Subir Nível
-              </button>
-            </div>
+                  <button
+                  onClick={() => router.push(currentUserRole === 'master' || currentUserRole === 'admin' ? '/master/pdj' : `/character/${id}`)}
+                  className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
+                >
+                  Voltar à visualização
+                </button>
+                  <button
+                    onClick={() => setShowLevelUpModal(true)}
+                    title="Subir Nível / NEX"
+                    className="border border-white/10 px-3 py-1 rounded text-sm hover:bg-white/5"
+                  >
+                    ⬆️ Subir Nível
+                  </button>
+              </div>
           </div>
         </div>
         <LevelUpModal open={showLevelUpModal} onClose={()=>setShowLevelUpModal(false)} onApply={(t)=>openChooseTrailIfNeeded(t)} />
@@ -924,10 +1092,34 @@ export default function CharacterEditPage() {
         <ChooseFeatureModal open={showChooseFeatureModal} onClose={()=>{ setShowChooseFeatureModal(false); setSelectedFeatureId(null); setPendingLevelUpType('level'); }} options={featureOptions} onConfirm={(featureId)=>{
           setShowChooseFeatureModal(false);
           setSelectedFeatureId(null);
-          // apply levelUp with feature selection
+          // apply levelUp with feature selection using pending type
+          const typeToUse = pendingLevelUpType || 'nex';
           const extra = Object.assign({}, pendingLevelUpExtra || {}, { selected_feature_id: featureId });
           setPendingLevelUpExtra(null);
-          applyLevelUp('nex', extra);
+          applyLevelUp(typeToUse, extra);
+        }} />
+        <ChooseTrainingModal open={showChooseTrainingModal} onClose={()=>{ setShowChooseTrainingModal(false); setSelectedTrainingIds([]); setTrainingOptions([]); setTrainingAllowedCount(0); setPendingLevelUpType('level'); }} options={trainingOptions} allowedCount={trainingAllowedCount} selectedIds={selectedTrainingIds} onToggle={(id)=>{
+            setSelectedTrainingIds(prev => {
+              const s = new Set(prev || []);
+              if (s.has(id)) s.delete(id); else s.add(id);
+              // enforce allowedCount
+              if (s.size > trainingAllowedCount) return Array.from(prev || []);
+              return Array.from(s);
+            });
+        }} onConfirm={() => {
+          if (!selectedTrainingIds || selectedTrainingIds.length === 0) return setStatus('Selecione ao menos uma perícia');
+          const extra = Object.assign({}, pendingLevelUpExtra || {}, { selected_training_feature_ids: selectedTrainingIds });
+          setSelectedTrainingIds([]);
+          setPendingLevelUpExtra(null);
+          setShowChooseTrainingModal(false);
+          applyLevelUp(pendingLevelUpType || 'level', extra);
+        }} />
+        <ChooseAttributeModal open={showChooseAttributeModal} onClose={()=>{ setShowChooseAttributeModal(false); setSelectedAttributeForLevelUp(null); setPendingLevelUpType('level'); }} onConfirm={(attrKey)=>{
+          setShowChooseAttributeModal(false);
+          const extra = Object.assign({}, pendingLevelUpExtra || {}, { selected_attribute: attrKey });
+          setPendingLevelUpExtra(null);
+          setSelectedAttributeForLevelUp(null);
+          applyLevelUp(pendingLevelUpType || 'level', extra);
         }} />
         <TranscendModal open={showTranscendModal} onClose={()=>setShowTranscendModal(false)} />
       </div>

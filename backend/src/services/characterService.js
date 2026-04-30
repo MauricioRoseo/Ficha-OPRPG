@@ -52,7 +52,7 @@ const CharacterService = {
                     if (i >= toAdd.length) return cb(null);
                     const fid = toAdd[i++];
                     if (!fid) return addNext();
-                    FeatureService.addFeatureToCharacter(characterId, fid, { training_level: 'none', value: 1 }, (errF) => {
+                    FeatureService.addFeatureToCharacter(characterId, fid, { training_level: 'trained', value: 1 }, (errF) => {
                       if (errF) console.warn('Erro ao adicionar feature de origem:', errF && errF.message);
                       addNext();
                     });
@@ -101,7 +101,54 @@ const CharacterService = {
       // populate names for class/origin if ids provided
       if (data.classe_id) {
         ClassModel.findById(data.classe_id, (errCl, clsRes) => {
-          if (!errCl && clsRes && clsRes.length) data.classe = clsRes[0].name;
+          if (!errCl && clsRes && clsRes.length) {
+            const cls = clsRes[0];
+            data.classe = cls.name;
+            // copy class proficiencies text to character.proficiencias
+            try {
+              let profText = null;
+              const profRaw = cls.proficiencies || cls.proficiencies_text || cls.proficiencies_json || null;
+              if (profRaw) {
+                if (typeof profRaw === 'string') {
+                  const trimmed = profRaw.trim();
+                  if ((trimmed.startsWith('{') || trimmed.startsWith('['))) {
+                    try {
+                      const parsed = JSON.parse(trimmed);
+                      if (Array.isArray(parsed)) profText = parsed.join('\n');
+                      else if (typeof parsed === 'object') profText = JSON.stringify(parsed);
+                    } catch (e) {
+                      profText = profRaw;
+                    }
+                  } else profText = profRaw;
+                } else if (Array.isArray(profRaw)) {
+                  profText = profRaw.join('\n');
+                } else if (typeof profRaw === 'object') {
+                  profText = JSON.stringify(profRaw);
+                }
+              }
+              if (profText) data.proficiencias = profText;
+              // compute initial prestigio from proficiencies first numeric line (reuse update logic)
+              if (data.proficiencias) {
+                let prestigio = 0;
+                try {
+                  const lines = (data.proficiencias || '').split(/\r?\n/);
+                  if (lines[0] && /\d+/.test(lines[0])) {
+                    const m = lines[0].match(/(\d+)/);
+                    if (m) prestigio = Number(m[1]);
+                  }
+                } catch (e) { prestigio = 0; }
+                data.prestigio = prestigio;
+                const computePatente = (p) => {
+                  if (p >= 200) return 'Agente de Elite';
+                  if (p >= 100) return 'Oficial de Operações';
+                  if (p >= 50) return 'Agente Especial';
+                  if (p >= 20) return 'Operador';
+                  return 'Recruta';
+                };
+                data.patente = computePatente(prestigio);
+              }
+            } catch (e) { /* ignore proficiencies copy errors */ }
+          }
           if (data.origem_id) {
             OriginModel.findById(data.origem_id, (errO, orgRes) => {
               const org = (Array.isArray(orgRes) && orgRes.length) ? orgRes[0] : orgRes;

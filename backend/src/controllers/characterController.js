@@ -290,6 +290,11 @@ CharacterController.levelUp = (req, res) => {
     else if (type === 'nex') newNex = curNex + 5;
     else if (type === 'both') { newLevel = curLevel + 1; newNex = curNex + 5; }
 
+    // cap NEX at 99
+    if (newNex > 99) newNex = 99;
+    // cap level at 20
+    if (newLevel > 20) newLevel = 20;
+
     const selected_trilha_id = payload.selected_trilha_id !== undefined ? payload.selected_trilha_id : null;
     let selected_trilha_name = null;
 
@@ -298,6 +303,8 @@ CharacterController.levelUp = (req, res) => {
 
     // If leveling to 2, require trilha selection (if not already set)
     const willReachLevel2 = (curLevel < 2 && newLevel >= 2);
+    // If leveling to 8, may need to add trilha ability for level 8
+    const willReachLevel8 = (curLevel < 8 && newLevel >= 8);
     // If NEX crosses 50, require afinidade selection if character has none
     const willReachNex50 = (curNex < 50 && newNex >= 50);
 
@@ -346,15 +353,17 @@ CharacterController.levelUp = (req, res) => {
         if (err2) return res.status(500).json(err2);
         // after updating details, if we need to add lvl2 ability from trail
         const maybeAddTrailAbility = (next) => {
-          // Only add trail lvl2 ability when the character is actually reaching level 2
-          // (i.e., this levelUp operation increases level to 2). Do not add when only NEX is increased.
+          // Only add trail abilities when the character is actually reaching the corresponding level
           if (!mergedPayload.trilha_id) return next();
-          if (!willReachLevel2) return next();
+          // determine which ability to add (lvl2 or lvl8)
+          const shouldAddLvl2 = willReachLevel2;
+          const shouldAddLvl8 = willReachLevel8;
+          if (!shouldAddLvl2 && !shouldAddLvl8) return next();
           TrailModel.findByClassId(mergedPayload.classe_id, (errT, trails) => {
             if (errT) return res.status(500).json(errT);
             const found = (trails || []).find(t => t.id === Number(mergedPayload.trilha_id));
             if (!found) return res.status(400).json({ message: 'Trilha inválida' });
-            const abilityId = found.ability_lvl_2_id || null;
+            const abilityId = shouldAddLvl2 ? (found.ability_lvl_2_id || null) : (shouldAddLvl8 ? (found.ability_lvl_8_id || null) : null);
             if (!abilityId) return next();
             // snapshot feature into character
             FeatureModel.findById(abilityId, (errF, feat) => {
@@ -372,7 +381,7 @@ CharacterController.levelUp = (req, res) => {
                 has_encumbrance_penalty: feat.has_encumbrance_penalty,
                 encumbrance_penalty: feat.encumbrance_penalty
               }, (errAdd) => {
-                if (errAdd) console.warn('Erro ao adicionar habilidade de trilha lvl2:', errAdd && errAdd.message);
+                if (errAdd) console.warn('Erro ao adicionar habilidade de trilha:', errAdd && errAdd.message);
                 return next();
               });
             });
@@ -555,7 +564,97 @@ CharacterController.levelUp = (req, res) => {
 
         maybeAddTrailAbility(() => {
           maybeAddFeature(() => {
-            maybeAddRitual(() => callbackRecalc());
+            maybeAddRitual(() => {
+              const maybeApplyTraining = (nextTrain) => {
+                // handle training selection: payload.selected_training_feature_ids (array of character_feature ids) or single id
+                let sel = payload.selected_training_feature_ids !== undefined ? payload.selected_training_feature_ids : null;
+                if (!sel && payload.selected_training_feature_id) sel = [payload.selected_training_feature_id];
+                if (!sel) return nextTrain();
+                const FeatureModel = require('../models/featureModel');
+                const ClassModel = require('../models/classModel');
+                const AttributeModel = require('../models/attributeModel');
+                // compute allowed_count again
+                ClassModel.findById(character.classe_id, (errCl, clsRes) => {
+                  let classTraining = 0;
+                  if (!errCl && clsRes && clsRes.length) classTraining = Number(clsRes[0].training_level || 0);
+                  AttributeModel.findByCharacterId(id, (errA, attrsRes) => {
+                    let intelecto = 0;
+                    if (!errA && attrsRes && attrsRes.length) intelecto = Number(attrsRes[0].intelecto || 0);
+                    const allowed_count = Number(classTraining || 0) + Number(intelecto || 0);
+                    const chosen = Array.isArray(sel) ? sel.map(Number).filter(Boolean) : [];
+                    if (chosen.length > allowed_count) {
+                      console.warn('[levelUp] user selected more training items than allowed', { chosenCount: chosen.length, allowed_count });
+                      return res.status(400).json({ message: 'Selecionou mais perícias do que o permitido' });
+                    }
+                    // load character features to map and validate
+                    FeatureModel.getByCharacter(id, (errF, features) => {
+                      if (errF) {
+                        console.warn('[levelUp] could not load features for training application', errF && errF.message);
+                        return nextTrain();
+                      }
+                      const featureByCharId = {};
+                      (features || []).forEach(f => {
+                        if (f && f.id) featureByCharId[Number(f.id)] = f;
+                      });
+                      // prepare updates
+                      const toUpdate = [];
+                      chosen.forEach(ch => {
+                        const f = featureByCharId[Number(ch)];
+                        if (!f) return; // skip invalid selections
+                        // only pericia types should be eligible
+                        if (f.type !== 'pericia') return;
+                        const current = (f.training_level || 'none');
+                        const nextMap = { none: 'trained', trained: 'veteran', veteran: 'expert', expert: 'expert' };
+                        const nextLvl = nextMap[String(current)] || 'trained';
+                        toUpdate.push({ id: Number(ch), training_level: nextLvl });
+                      });
+                      // apply sequentially
+                      const applyNext = (i) => {
+                        if (i >= toUpdate.length) return nextTrain();
+                        const u = toUpdate[i];
+                        FeatureModel.updateCharacterFeature(u.id, { training_level: u.training_level }, (errU) => {
+                          if (errU) console.warn('[levelUp] error updating training for feature', u.id, errU && errU.message);
+                          applyNext(i+1);
+                        });
+                      };
+                      applyNext(0);
+                    });
+                  });
+                });
+              };
+
+              maybeApplyTraining(() => {
+                const maybeIncreaseAttribute = (nextAttr) => {
+                  let selAttr = payload.selected_attribute !== undefined ? payload.selected_attribute : null;
+                  if (!selAttr) return nextAttr();
+                  const allowed = ['forca','agilidade','intelecto','vigor','presenca'];
+                  const key = String(selAttr || '').toLowerCase();
+                  if (!allowed.includes(key)) return res.status(400).json({ message: 'Atributo inválido' });
+                  const AttributeModel = require('../models/attributeModel');
+                  AttributeModel.findByCharacterId(id, (errA, attrsRes) => {
+                    if (errA) {
+                      console.warn('[levelUp] could not read attributes to apply attribute choice:', errA && errA.message);
+                      return nextAttr();
+                    }
+                    const current = (attrsRes && attrsRes.length) ? attrsRes[0] : { forca:0, agilidade:0, intelecto:0, vigor:0, presenca:0 };
+                    const updated = {
+                      forca: Number(current.forca || 0),
+                      agilidade: Number(current.agilidade || 0),
+                      intelecto: Number(current.intelecto || 0),
+                      vigor: Number(current.vigor || 0),
+                      presenca: Number(current.presenca || 0)
+                    };
+                    updated[key] = (Number(updated[key] || 0)) + 1;
+                    AttributeModel.update(id, updated, (errU) => {
+                      if (errU) console.warn('[levelUp] failed to update attribute:', errU && errU.message);
+                      return nextAttr();
+                    });
+                  });
+                };
+
+                maybeIncreaseAttribute(() => callbackRecalc());
+              });
+            });
           });
         });
       });
@@ -564,6 +663,51 @@ CharacterController.levelUp = (req, res) => {
     // If leveling to 2 and character has no trilha yet, require selection
     if (willReachLevel2 && (!character.trilha_id && !selected_trilha_id)) {
       return res.status(400).json({ message: 'Seleção de trilha necessária ao atingir nível 2' });
+    }
+
+    // If reaching certain milestone levels, require the player to select a class power or a general power
+    const GIFT_LEVELS = [3,6,9,12,15,18];
+    // special attribute-increase levels should not trigger gift feature requirement
+    const SPECIAL_ATTR_LEVELS = [4,10,16,19];
+    const willGainGiftFeature = (curLevel < newLevel && GIFT_LEVELS.includes(newLevel) && !SPECIAL_ATTR_LEVELS.includes(newLevel));
+    // check if a selected feature was provided
+    const hasSelectedFeature = (payload.selected_feature_id !== undefined && payload.selected_feature_id) || (Array.isArray(payload.selected_feature_ids) && payload.selected_feature_ids.length);
+    if (willGainGiftFeature && !hasSelectedFeature) {
+      // tell client which origins are allowed so it can show a filtered picker
+      const className = (character.classe || '').trim();
+      const classPowerOrigin = className ? `Poder de ${className}` : null;
+      const allowed = classPowerOrigin ? ['Poder Geral', classPowerOrigin] : ['Poder Geral'];
+      return res.status(400).json({ message: 'Seleção de poder necessária ao atingir este nível', required: true, allowed_origins: allowed });
+    }
+
+    // If reaching certain special attribute-increase levels, require player to choose an attribute
+    const willGainAttributeChoice = (curLevel < newLevel && SPECIAL_ATTR_LEVELS.includes(newLevel));
+    const hasSelectedAttribute = payload.selected_attribute !== undefined && payload.selected_attribute;
+    if (willGainAttributeChoice && !hasSelectedAttribute) {
+      return res.status(400).json({ message: 'Seleção de atributo necessária ao atingir este nível', required: true, allowed_attributes: ['forca','agilidade','intelecto','vigor','presenca'] });
+    }
+
+    // If reaching training-grade levels, require player to choose existing pericias to upgrade
+    const GRADE_LEVELS = [7,14];
+    const willGainTrainingGrade = (curLevel < newLevel && GRADE_LEVELS.includes(newLevel));
+    const hasSelectedTraining = (payload.selected_training_feature_ids !== undefined && Array.isArray(payload.selected_training_feature_ids) && payload.selected_training_feature_ids.length) || (payload.selected_training_feature_id !== undefined && payload.selected_training_feature_id);
+    if (willGainTrainingGrade && !hasSelectedTraining) {
+      // compute allowed count = class.training_level + character.intelecto
+      const ClassModel = require('../models/classModel');
+      const AttributeModel = require('../models/attributeModel');
+      const classId = character.classe_id;
+      let classTraining = 0;
+      ClassModel.findById(classId, (errCl, clsRes) => {
+        if (!errCl && clsRes && clsRes.length) classTraining = Number(clsRes[0].training_level || 0);
+        AttributeModel.findByCharacterId(id, (errA, attrsRes) => {
+          let intelecto = 0;
+          if (!errA && attrsRes && attrsRes.length) intelecto = Number(attrsRes[0].intelecto || 0);
+          const allowed_count = Number(classTraining || 0) + Number(intelecto || 0);
+          return res.status(400).json({ message: 'Seleção de aprimoramento necessária ao atingir este nível', required: true, training: true, allowed_count });
+        });
+      });
+      // stop further processing in this request (response will be sent from the callback above)
+      return;
     }
 
     // If crossing NEX 50 and character has no afinidade, require selection

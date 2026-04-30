@@ -44,12 +44,17 @@ const FeatureController = {
   search: (req, res) => {
     const q = req.query.q || '';
     const type = req.query.type || null;
+    const origin = req.query.origin || null;
 
     FeatureService.getAllFeatures((err, results) => {
       if (err) return res.status(500).json(err);
 
       let filtered = results || [];
       if (type) filtered = filtered.filter(f => f.type === type);
+      if (origin) filtered = filtered.filter(f => {
+        const fo = (f.origin || '').toString();
+        return fo.toLowerCase() === String(origin).toLowerCase();
+      });
       if (q) filtered = filtered.filter(f => (f.name || '').toLowerCase().includes(q.toLowerCase()));
 
       res.json(filtered);
