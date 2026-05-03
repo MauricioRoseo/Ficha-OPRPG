@@ -303,8 +303,10 @@ CharacterController.levelUp = (req, res) => {
 
     // If leveling to 2, require trilha selection (if not already set)
     const willReachLevel2 = (curLevel < 2 && newLevel >= 2);
-    // If leveling to 8, may need to add trilha ability for level 8
+    // If leveling to 8/13/20, may need to add trilha abilities for those levels
     const willReachLevel8 = (curLevel < 8 && newLevel >= 8);
+    const willReachLevel13 = (curLevel < 13 && newLevel >= 13);
+    const willReachLevel20 = (curLevel < 20 && newLevel >= 20);
     // If NEX crosses 50, require afinidade selection if character has none
     const willReachNex50 = (curNex < 50 && newNex >= 50);
 
@@ -358,12 +360,18 @@ CharacterController.levelUp = (req, res) => {
           // determine which ability to add (lvl2 or lvl8)
           const shouldAddLvl2 = willReachLevel2;
           const shouldAddLvl8 = willReachLevel8;
-          if (!shouldAddLvl2 && !shouldAddLvl8) return next();
+          const shouldAddLvl13 = willReachLevel13;
+          const shouldAddLvl20 = willReachLevel20;
+          if (!shouldAddLvl2 && !shouldAddLvl8 && !shouldAddLvl13 && !shouldAddLvl20) return next();
           TrailModel.findByClassId(mergedPayload.classe_id, (errT, trails) => {
             if (errT) return res.status(500).json(errT);
             const found = (trails || []).find(t => t.id === Number(mergedPayload.trilha_id));
             if (!found) return res.status(400).json({ message: 'Trilha inválida' });
-            const abilityId = shouldAddLvl2 ? (found.ability_lvl_2_id || null) : (shouldAddLvl8 ? (found.ability_lvl_8_id || null) : null);
+            let abilityId = null;
+            if (shouldAddLvl2) abilityId = found.ability_lvl_2_id || null;
+            else if (shouldAddLvl8) abilityId = found.ability_lvl_8_id || null;
+            else if (shouldAddLvl13) abilityId = found.ability_lvl_13_id || null;
+            else if (shouldAddLvl20) abilityId = found.ability_lvl_20_id || null;
             if (!abilityId) return next();
             // snapshot feature into character
             FeatureModel.findById(abilityId, (errF, feat) => {

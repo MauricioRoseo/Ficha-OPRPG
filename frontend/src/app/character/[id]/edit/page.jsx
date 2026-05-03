@@ -59,6 +59,8 @@ export default function CharacterEditPage() {
   const [showChooseFeatureModal, setShowChooseFeatureModal] = useState(false);
   const [featureOptions, setFeatureOptions] = useState([]);
   const [selectedFeatureId, setSelectedFeatureId] = useState(null);
+  const [showVersatilityModal, setShowVersatilityModal] = useState(false);
+  const [featureModalTitle, setFeatureModalTitle] = useState('Escolha uma habilidade (Poder)');
   const [showChooseAttributeModal, setShowChooseAttributeModal] = useState(false);
   const [selectedAttributeForLevelUp, setSelectedAttributeForLevelUp] = useState(null);
   const [showChooseTrainingModal, setShowChooseTrainingModal] = useState(false);
@@ -541,7 +543,7 @@ export default function CharacterEditPage() {
     );
   }
 
-  function ChooseFeatureModal({ open, onClose, options, onConfirm }) {
+  function ChooseFeatureModal({ title, open, onClose, options, onConfirm }) {
     if (!open) return null;
     try { console.warn('ChooseFeatureModal render', { open: !!open, optionsCount: (options||[]).length }); window.__chooseFeatureModalRendered = true; } catch(e) {}
     if (typeof document === 'undefined') return null;
@@ -550,7 +552,7 @@ export default function CharacterEditPage() {
         <div style={{position:'fixed', top:12, right:12, zIndex:100000, background:'#ff4d4d', color:'#fff', padding:'6px 8px', borderRadius:6, fontSize:12}}>DEBUG: ChooseFeatureModal</div>
         <div className="absolute inset-0 bg-black/60" onClick={onClose} />
         <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-2xl z-[10006] pointer-events-auto">
-          <h3 className="text-lg font-bold mb-3">Escolha uma habilidade (Poder Paranormal)</h3>
+          <h3 className="text-lg font-bold mb-3">{title || 'Escolha uma habilidade'}</h3>
           <div className="space-y-3 max-h-[60vh] overflow-auto">
             {(options || []).map(opt => (
               <div key={opt.id} className={`p-3 border rounded ${selectedFeatureId === opt.id ? 'border-green-500 bg-green-900/10' : 'bg-transparent'}`} onClick={() => setSelectedFeatureId(opt.id)}>
@@ -568,6 +570,30 @@ export default function CharacterEditPage() {
           <div className="flex justify-end gap-2 mt-4">
             <button className="px-3 py-1 border rounded" onClick={onClose}>Cancelar</button>
             <button className="px-3 py-2 bg-green-600 rounded" onClick={() => { if (!selectedFeatureId) return setStatus('Selecione uma habilidade'); onConfirm(selectedFeatureId); }}>Confirmar escolha</button>
+          </div>
+        </div>
+      </div>,
+      document.body
+    );
+  }
+
+  function VersatilityModal({ open, onClose, onChoosePower, onChooseTrailAbility }) {
+    if (!open) return null;
+    if (typeof document === 'undefined') return null;
+    return createPortal(
+      <div className="fixed inset-0 z-[10015] flex items-center justify-center">
+        <div className="absolute inset-0 bg-black/60" onClick={onClose} />
+        <div className="relative bg-[#021018] border border-white/6 rounded-lg p-4 w-full max-w-md z-[10016] pointer-events-auto">
+          <h3 className="text-lg font-bold mb-3">Versatilidade</h3>
+          <div className="space-y-3">
+            <div className="text-sm text-gray-300">Ao atingir o nível 10, escolha uma das opções abaixo:</div>
+            <div className="flex flex-col gap-2 mt-3">
+              <button className="px-3 py-2 bg-rose-700 rounded" onClick={() => { onChoosePower && onChoosePower(); }}>Escolher um Poder de Classe</button>
+              <button className="px-3 py-2 bg-indigo-700 rounded" onClick={() => { onChooseTrailAbility && onChooseTrailAbility(); }}>Escolher Habilidade de Trilha (nível 2) de outra trilha</button>
+            </div>
+            <div className="flex justify-end mt-4">
+              <button className="px-3 py-1 border rounded" onClick={() => { onClose && onClose(); }}>Pular</button>
+            </div>
           </div>
         </div>
       </div>,
@@ -1089,7 +1115,7 @@ export default function CharacterEditPage() {
           setPendingLevelUpExtra(null);
           applyLevelUp(typeToUse, extra);
         }} />
-        <ChooseFeatureModal open={showChooseFeatureModal} onClose={()=>{ setShowChooseFeatureModal(false); setSelectedFeatureId(null); setPendingLevelUpType('level'); }} options={featureOptions} onConfirm={(featureId)=>{
+        <ChooseFeatureModal title={featureModalTitle} open={showChooseFeatureModal} onClose={()=>{ setShowChooseFeatureModal(false); setSelectedFeatureId(null); setPendingLevelUpType('level'); }} options={featureOptions} onConfirm={(featureId)=>{
           setShowChooseFeatureModal(false);
           setSelectedFeatureId(null);
           // apply levelUp with feature selection using pending type
@@ -1097,6 +1123,58 @@ export default function CharacterEditPage() {
           const extra = Object.assign({}, pendingLevelUpExtra || {}, { selected_feature_id: featureId });
           setPendingLevelUpExtra(null);
           applyLevelUp(typeToUse, extra);
+        }} />
+
+        <VersatilityModal open={showVersatilityModal} onClose={() => { setShowVersatilityModal(false); }} onChoosePower={async () => {
+          setShowVersatilityModal(false);
+          const clsName = (form && form.classe) || (character && character.classe) || '';
+          const classPowerOrigin = clsName ? `Poder de ${clsName}` : null;
+          try {
+            const tkn = localStorage.getItem('token');
+            const fres = await fetch(`http://localhost:3001/features`, { headers: { Authorization: `Bearer ${tkn}` } });
+            const feats = fres.ok ? await fres.json() : [];
+            const filtered = (feats || []).filter(f => {
+              if (!f) return false;
+              const origin = (f.origin || '').toString().toLowerCase();
+              return (classPowerOrigin && origin.includes(classPowerOrigin.toLowerCase())) || origin.includes('poder geral') || (f.name||'').toLowerCase().includes('poder');
+            });
+            setFeatureOptions(filtered);
+            setFeatureModalTitle(classPowerOrigin ? `Escolha um Poder de ${clsName}` : 'Escolha um Poder');
+            const extra = Object.assign({}, pendingLevelUpExtra || {});
+            setPendingLevelUpExtra(extra);
+            setShowChooseFeatureModal(true);
+          } catch (e) {
+            const extra = Object.assign({}, pendingLevelUpExtra || {});
+            setPendingLevelUpExtra(null);
+            applyLevelUp(pendingLevelUpType || 'level', extra);
+          }
+        }} onChooseTrailAbility={async () => {
+          setShowVersatilityModal(false);
+          try {
+            const tkn = localStorage.getItem('token');
+            const classId = form && form.classe_id || character && character.classe_id;
+            const curTrailId = form && form.trilha_id || character && character.trilha_id;
+            const tres = await fetch(`http://localhost:3001/templates/trails?classId=${classId}`, { headers: { Authorization: `Bearer ${tkn}` } });
+            const trails = tres.ok ? await tres.json() : [];
+            const abilityIds = (trails || []).filter(t => t && t.id && Number(t.id) !== Number(curTrailId)).map(t => t.ability_lvl_2_id).filter(Boolean);
+            if (!abilityIds.length) {
+              const extra = Object.assign({}, pendingLevelUpExtra || {});
+              setPendingLevelUpExtra(null);
+              return applyLevelUp(pendingLevelUpType || 'level', extra);
+            }
+            const fres = await fetch(`http://localhost:3001/features`, { headers: { Authorization: `Bearer ${tkn}` } });
+            const feats = fres.ok ? await fres.json() : [];
+            const filtered = (feats || []).filter(f => abilityIds.includes(f.id));
+            setFeatureOptions(filtered);
+            setFeatureModalTitle('Escolha uma Habilidade de Trilha (nível 2) de outra trilha');
+            const extra = Object.assign({}, pendingLevelUpExtra || {});
+            setPendingLevelUpExtra(extra);
+            setShowChooseFeatureModal(true);
+          } catch (e) {
+            const extra = Object.assign({}, pendingLevelUpExtra || {});
+            setPendingLevelUpExtra(null);
+            applyLevelUp(pendingLevelUpType || 'level', extra);
+          }
         }} />
         <ChooseTrainingModal open={showChooseTrainingModal} onClose={()=>{ setShowChooseTrainingModal(false); setSelectedTrainingIds([]); setTrainingOptions([]); setTrainingAllowedCount(0); setPendingLevelUpType('level'); }} options={trainingOptions} allowedCount={trainingAllowedCount} selectedIds={selectedTrainingIds} onToggle={(id)=>{
             setSelectedTrainingIds(prev => {
@@ -1117,8 +1195,19 @@ export default function CharacterEditPage() {
         <ChooseAttributeModal open={showChooseAttributeModal} onClose={()=>{ setShowChooseAttributeModal(false); setSelectedAttributeForLevelUp(null); setPendingLevelUpType('level'); }} onConfirm={(attrKey)=>{
           setShowChooseAttributeModal(false);
           const extra = Object.assign({}, pendingLevelUpExtra || {}, { selected_attribute: attrKey });
-          setPendingLevelUpExtra(null);
+          setPendingLevelUpExtra(extra);
           setSelectedAttributeForLevelUp(null);
+          // if this level up will reach level 10, open Versatilidade modal (in addition to attribute choice)
+          try {
+            const curLevel = Number(form && form.nivel) || 0;
+            const willReach = curLevel + 1;
+            if (willReach === 10) {
+              setShowVersatilityModal(true);
+              return;
+            }
+          } catch (e) {}
+          // default: apply immediately
+          setPendingLevelUpExtra(null);
           applyLevelUp(pendingLevelUpType || 'level', extra);
         }} />
         <TranscendModal open={showTranscendModal} onClose={()=>setShowTranscendModal(false)} />
