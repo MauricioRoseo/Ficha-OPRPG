@@ -262,6 +262,27 @@ const CharacterController = {
       });
     });
   }
+,
+  // retorna notas do personagem
+  getNotes: (req, res) => {
+    const { id } = req.params;
+    const user = req.user || {};
+    const userId = user.id;
+    const CharacterModel = require('../models/characterModel');
+    const CharacterNoteModel = require('../models/characterNoteModel');
+
+    CharacterModel.findById(id, (err, character) => {
+      if (err) return res.status(500).json(err);
+      if (!character) return res.status(404).json({ message: 'Personagem não encontrado' });
+      // allow if owner or master/admin
+      if (character.user_id !== userId && !(user && (user.role === 'master' || user.role === 'admin'))) return res.status(403).json({ message: 'Acesso negado' });
+
+      CharacterNoteModel.findByCharacterId(id, (err2, notes) => {
+        if (err2) return res.status(500).json(err2);
+        return res.json(notes || []);
+      });
+    });
+  },
 };
 
 // Level up endpoint: adjust nivel and/or nex and persist changes
