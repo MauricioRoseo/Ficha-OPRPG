@@ -229,7 +229,9 @@ export default function RituaisPanel({ character, attributes, editable = false }
         <div className="flex justify-between items-center mb-3">
             <div className="text-sm text-gray-400">Rituais conhecidos e limites</div>
             <div className="flex gap-2">
-              <button onClick={()=>{ setShowModal(true); setCatalogResults([]); setSearchTerm(''); }} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar Ritual</button>
+              {editable ? (
+                <button onClick={()=>{ setShowModal(true); setCatalogResults([]); setSearchTerm(''); }} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar Ritual</button>
+              ) : null}
               {editable ? (
                 <button onClick={()=>{ setShowModifiers(true); }} className="px-2 py-1 border border-white/10 rounded text-sm">Config</button>
               ) : null}

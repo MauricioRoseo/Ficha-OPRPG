@@ -74,9 +74,11 @@ export default function SkillsPanel({ character, editable = false }) {
       <div className="panel p-3">
         <div className="flex justify-between items-center mb-3">
           <div className="text-sm text-gray-400">Poderes de Origem, Classe, Geral e Paranormal</div>
-          <div className="flex gap-2">
-            <button onClick={()=>{ setShowModal(true); setCatalogResults([]); setSearchTerm(''); }} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar Habilidade</button>
-          </div>
+          {editable ? (
+            <div className="flex gap-2">
+              <button onClick={()=>{ setShowModal(true); setCatalogResults([]); setSearchTerm(''); }} className="px-2 py-1 border border-white/10 rounded text-sm">Adicionar Habilidade</button>
+            </div>
+          ) : null}
         </div>
 
         <div className="grid grid-cols-1 gap-2">

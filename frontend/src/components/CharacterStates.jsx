@@ -2,24 +2,41 @@
 
 import React, { useEffect, useState } from "react";
 
-export default function CharacterStates({ character }) {
+export default function CharacterStates({ character, editable = false }) {
   const [morrendo, setMorrendo] = useState(0);
   const [enlouquecendo, setEnlouquecendo] = useState(0);
   const [morrendoEnabled, setMorrendoEnabled] = useState(false);
   const [enlouquecendoEnabled, setEnlouquecendoEnabled] = useState(false);
   const saveTimer = React.useRef(null);
+  const [deslocAtual, setDeslocAtual] = useState(null);
+  const [deslocMax, setDeslocMax] = useState(null);
+  const deslocTimer = React.useRef(null);
+  const deslocMaxTimer = React.useRef(null);
+  const _skipInitialStatesSave = React.useRef(true);
+  const _skipInitialDeslocSave = React.useRef(true);
 
+  const _loadedCharId = React.useRef(null);
   useEffect(() => {
     setMorrendo(Number(character.morrendo) || 0);
     setEnlouquecendo(Number(character.enlouquecendo) || 0);
     setMorrendoEnabled(Boolean(Number(character.morrendo)));
     setEnlouquecendoEnabled(Boolean(Number(character.enlouquecendo)));
+    // initialize deslocAtual only when switching to a different character to avoid overwriting edits
+    const cid = character && character.id ? String(character.id) : null;
+    if (_loadedCharId.current !== cid) {
+      _loadedCharId.current = cid;
+      setDeslocAtual((character && (character.deslocamento_atual !== undefined ? character.deslocamento_atual : null)) ?? null);
+      setDeslocMax((character && (character.deslocamento_max !== undefined ? character.deslocamento_max : null)) ?? null);
+    }
   }, [character]);
 
   // salva morrendo/enlouquecendo com debounce
   useEffect(() => {
     if (!character || !character.id) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
+
+    // skip first autosave triggered by initial state population
+    if (_skipInitialStatesSave.current) { _skipInitialStatesSave.current = false; return; }
 
     saveTimer.current = setTimeout(async () => {
       try {
@@ -39,6 +56,7 @@ export default function CharacterStates({ character }) {
           },
           body: JSON.stringify(payload)
         });
+        try { window.dispatchEvent(new CustomEvent('character:details_saved', { detail: { characterId: character.id, field: 'morrendo_enlouquecendo', value: { morrendo: payload.morrendo, enlouquecendo: payload.enlouquecendo }, origin: 'client', ts: Date.now() } })); } catch(e) {}
       } catch (e) {
         // ignore
       }
@@ -46,6 +64,62 @@ export default function CharacterStates({ character }) {
 
     return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
   }, [morrendo, enlouquecendo, morrendoEnabled, enlouquecendoEnabled, character]);
+
+  // autosave deslocamento_atual when in editable (view) mode
+  useEffect(() => {
+    if (!editable) return;
+    if (!character || !character.id) return;
+    if (deslocTimer.current) clearTimeout(deslocTimer.current);
+
+    // skip first autosave after loading character
+    if (_skipInitialDeslocSave.current) { _skipInitialDeslocSave.current = false; return; }
+
+    deslocTimer.current = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const payload = { deslocamento_atual: deslocAtual === null || deslocAtual === '' ? null : Number(deslocAtual) };
+        const res = await fetch(`http://localhost:3001/characters/${character.id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          try { window.dispatchEvent(new CustomEvent('character:details_saved', { detail: { characterId: character.id, field: 'deslocamento_atual', value: payload.deslocamento_atual, origin: 'client', ts: Date.now() } })); } catch(e) {}
+        }
+      } catch (e) {
+        // ignore
+      }
+    }, 600);
+
+    return () => { if (deslocTimer.current) clearTimeout(deslocTimer.current); };
+  }, [deslocAtual, editable, character]);
+
+  // autosave deslocamento_max when in editable mode
+  useEffect(() => {
+    if (!editable) return;
+    if (!character || !character.id) return;
+    if (deslocMaxTimer.current) clearTimeout(deslocMaxTimer.current);
+
+    // skip first autosave after loading character for deslocamento_max as well
+    if (_skipInitialDeslocSave.current) { _skipInitialDeslocSave.current = false; return; }
+
+    deslocMaxTimer.current = setTimeout(async () => {
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) return;
+        const payload = { deslocamento_max: deslocMax === null || deslocMax === '' ? null : Number(deslocMax) };
+        const res = await fetch(`http://localhost:3001/characters/${character.id}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` }, body: JSON.stringify(payload)
+        });
+        if (res.ok) {
+          try { window.dispatchEvent(new CustomEvent('character:details_saved', { detail: { characterId: character.id, field: 'deslocamento_max', value: payload.deslocamento_max, origin: 'client', ts: Date.now() } })); } catch(e) {}
+        }
+      } catch (e) {
+        // ignore
+      }
+    }, 600);
+
+    return () => { if (deslocMaxTimer.current) clearTimeout(deslocMaxTimer.current); };
+  }, [deslocMax, editable, character]);
 
   const clamp = (v) => {
     let n = Number(v) || 0; if (n < 0) n = 0; if (n > 3) n = 3; return n;
@@ -142,12 +216,20 @@ export default function CharacterStates({ character }) {
             <div className="mt-2 grid grid-cols-2 gap-2">
               <div className="bg-white/2 rounded p-3 text-center">
                 <div className="text-xs text-gray-400">Atual</div>
-                <div className="text-lg font-bold mt-1">{character?.deslocamento_atual ?? '-'}</div>
+                  {editable ? (
+                    <input type="number" value={deslocAtual ?? ''} onChange={e=>setDeslocAtual(e.target.value)} className="w-full text-center text-lg font-bold bg-transparent" style={{ outline: 'none' }} />
+                  ) : (
+                    <div className="text-lg font-bold mt-1">{character?.deslocamento_atual ?? '-'}</div>
+                  )}
               </div>
 
-              <div className="bg-white/2 rounded p-3 text-center">
+                <div className="bg-white/2 rounded p-3 text-center">
                 <div className="text-xs text-gray-400">Máximo</div>
-                <div className="text-lg font-bold mt-1">{character?.deslocamento_max ?? '-'}</div>
+                {editable ? (
+                  <input type="number" value={deslocMax ?? ''} onChange={e=>setDeslocMax(e.target.value)} className="w-full text-center text-lg font-bold bg-transparent" style={{ outline: 'none' }} />
+                ) : (
+                  <div className="text-lg font-bold mt-1">{character?.deslocamento_max ?? '-'}</div>
+                )}
               </div>
             </div>
           </div>

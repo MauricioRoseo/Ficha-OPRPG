@@ -46,6 +46,29 @@ export default function Header() {
     }).catch((err) => {
       console.debug('[Header] /auth/me fetch failed', err && err.message);
     });
+
+    // temporary: patch window.fetch to log PUTs to /characters for debugging autosaves
+    try {
+      if (typeof window !== 'undefined' && !window.__fetchPatchedForChars) {
+        window.__fetchPatchedForChars = true;
+        window.__origFetch = window.fetch.bind(window);
+        window.fetch = async function(resource, init) {
+          try {
+            const method = (init && init.method) || 'GET';
+            const url = typeof resource === 'string' ? resource : (resource && resource.url) || '';
+            if (method && method.toUpperCase() === 'PUT' && url && url.includes('/characters')) {
+              try {
+                const body = init && init.body ? JSON.parse(init.body) : null;
+                console.debug('[FETCH-WRAP] PUT', url, 'body=', body, '\nstack=', (new Error()).stack);
+              } catch (e) {
+                console.debug('[FETCH-WRAP] PUT', url, 'body=<<unparseable>>', '\nstack=', (new Error()).stack);
+              }
+            }
+          } catch (e) {}
+          return window.__origFetch(resource, init);
+        };
+      }
+    } catch (e) {}
   }, []);
 
   // don't render header on the public login root page or on public layout views

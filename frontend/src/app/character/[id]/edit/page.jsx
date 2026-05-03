@@ -107,6 +107,25 @@ export default function CharacterEditPage() {
         });
         if (!res.ok) {
           setStatus("> erro ao carregar ficha");
+
+        const handler = async (ev) => {
+          try {
+            // ignore local-origin saves to avoid save->refetch->save loops while editing
+            if (ev && ev.detail && ev.detail.origin === 'client') return;
+            const cid = ev && ev.detail && ev.detail.characterId;
+            if (!cid || String(cid) !== String(id)) return;
+            const t = localStorage.getItem('token');
+            if (!t) return;
+            const res2 = await fetch(`http://localhost:3001/characters/${id}/full`, { headers: { Authorization: `Bearer ${t}` } });
+            if (!res2.ok) return;
+            const data2 = await res2.json();
+            setCharacter(data2.character || data2);
+            setForm(prev => ({ ...(prev||{}), nivel: (data2.character && data2.character.nivel) || prev.nivel, nex: (data2.character && data2.character.nex) || prev.nex, trilha_id: (data2.character && data2.character.trilha_id) || prev.trilha_id, trilha: (data2.character && data2.character.trilha) || prev.trilha, afinidade: (data2.character && data2.character.afinidade) || prev.afinidade, deslocamento_atual: (data2.character && (data2.character.deslocamento_atual !== undefined ? data2.character.deslocamento_atual : prev.deslocamento_atual)) || prev.deslocamento_atual, deslocamento_max: (data2.character && (data2.character.deslocamento_max !== undefined ? data2.character.deslocamento_max : prev.deslocamento_max)) || prev.deslocamento_max }));
+            setAttributes(data2.attributes || {});
+          } catch (e) {}
+        };
+        window.addEventListener('character:details_saved', handler);
+        return () => { window.removeEventListener('character:details_saved', handler); };
           return;
         }
         const data = await res.json();
@@ -125,6 +144,8 @@ export default function CharacterEditPage() {
           nex: (data.character && data.character.nex) || '',
           prestigio: (data.character && data.character.prestigio) || '',
           patente: (data.character && data.character.patente) || '',
+          deslocamento_atual: (data.character && (data.character.deslocamento_atual !== undefined ? data.character.deslocamento_atual : null)) || null,
+          deslocamento_max: (data.character && (data.character.deslocamento_max !== undefined ? data.character.deslocamento_max : null)) || null,
           afinidade: (data.character && data.character.afinidade) || '',
           imagem_perfil: (data.character && data.character.imagem_perfil) || '',
           imagem_token: (data.character && data.character.imagem_token) || ''
@@ -809,19 +830,27 @@ export default function CharacterEditPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>null);
+          console.warn('Failed to update note (edit page)', res.status, txt);
+          return;
+        }
       } else {
         const res = await fetch(`http://localhost:3001/characters/${id}/notes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>null);
+          console.warn('Failed to create note (edit page)', res.status, txt);
+          return;
+        }
       }
       await fetchNotes();
       handleNewNote();
     } catch (e) {
-      // ignore
+      console.error('Error saving note (edit page)', e);
     }
   };
 
@@ -1403,7 +1432,7 @@ export default function CharacterEditPage() {
               </div>
 
               <div className="md:col-span-2">
-                <CharacterStates character={character} />
+                <CharacterStates character={character} editable={true} />
               </div>
 
                 <div className="md:col-span-2">

@@ -66,6 +66,7 @@ export default function StatusSection({ character }) {
   const [esforco, setEsforco] = useState({ current: character.esforco_atual || character.esforco || 0, max: character.esforco_max || 0, temp: character.esforco_temp || 0 });
   const [sanidade, setSanidade] = useState({ current: character.sanidade_atual || 0, max: character.sanidade_max || 0 });
   const saveTimer = React.useRef(null);
+  const _skipInitialSave = React.useRef(true);
 
   useEffect(() => {
     setVida({ current: character.vida_atual || character.vida || 0, max: character.vida_max || 0, temp: character.vida_temp || 0 });
@@ -76,6 +77,9 @@ export default function StatusSection({ character }) {
   useEffect(() => {
     if (!character || !character.id) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
+
+    // skip initial autosave immediately after loading character to avoid creating a save-refetch loop
+    if (_skipInitialSave.current) { _skipInitialSave.current = false; return; }
 
     saveTimer.current = setTimeout(async () => {
       try {
@@ -90,7 +94,7 @@ export default function StatusSection({ character }) {
           sanidade_atual: Number(sanidade.current) || 0
         };
 
-        await fetch(`http://localhost:3001/characters/${character.id}`, {
+        const res = await fetch(`http://localhost:3001/characters/${character.id}`, {
           method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
@@ -98,6 +102,9 @@ export default function StatusSection({ character }) {
           },
           body: JSON.stringify(payload)
         });
+        if (res && res.ok) {
+          try { window.dispatchEvent(new CustomEvent('character:details_saved', { detail: { characterId: character.id, field: 'status', value: payload, origin: 'client', ts: Date.now() } })); } catch(e) {}
+        }
       } catch (e) {
         // ignore
       }

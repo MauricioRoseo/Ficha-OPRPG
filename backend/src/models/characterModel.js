@@ -135,6 +135,17 @@ CharacterModel.update = (id, data, callback) => {
     values.push(data.patrimonio);
   }
 
+  // Only include deslocamento_atual when provided to avoid overwriting with NULL
+  if (Object.prototype.hasOwnProperty.call(data, 'deslocamento_atual')) {
+    sql += `, deslocamento_atual = ? `;
+    values.push(data.deslocamento_atual !== undefined && data.deslocamento_atual !== null ? data.deslocamento_atual : null);
+  }
+  // Only include deslocamento_max when provided to avoid overwriting with NULL
+  if (Object.prototype.hasOwnProperty.call(data, 'deslocamento_max')) {
+    sql += `, deslocamento_max = ? `;
+    values.push(data.deslocamento_max !== undefined && data.deslocamento_max !== null ? data.deslocamento_max : null);
+  }
+
   sql += `WHERE id = ?`;
   values.push(id);
 

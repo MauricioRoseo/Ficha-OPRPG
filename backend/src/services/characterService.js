@@ -368,6 +368,15 @@ const CharacterService = {
         proficiencias: data.proficiencias
       };
 
+      // Only include deslocamento_atual when caller explicitly provided it
+      if (Object.prototype.hasOwnProperty.call(data, 'deslocamento_atual')) {
+        payload.deslocamento_atual = data.deslocamento_atual;
+      }
+      // Only include deslocamento_max when caller explicitly provided it
+      if (Object.prototype.hasOwnProperty.call(data, 'deslocamento_max')) {
+        payload.deslocamento_max = data.deslocamento_max;
+      }
+
       // Only include patrimonio in payload when explicitly provided by caller
       if (Object.prototype.hasOwnProperty.call(data, 'patrimonio')) {
         payload.patrimonio = data.patrimonio;

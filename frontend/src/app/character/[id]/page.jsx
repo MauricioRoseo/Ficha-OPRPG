@@ -111,6 +111,31 @@ export default function CharacterPage() {
     };
 
     fetchCharacter();
+    // listen for external saves to refresh character
+    const handler = async (ev) => {
+      try {
+        // ignore local-origin saves to avoid creating a save->refetch->save loop
+        if (ev && ev.detail && ev.detail.origin === 'client') return;
+        const cid = ev && ev.detail && ev.detail.characterId;
+        if (!cid || String(cid) !== String(id)) return;
+        const t = localStorage.getItem('token');
+        if (!t) return;
+        const res2 = await fetch(`http://localhost:3001/characters/${id}/full`, { headers: { Authorization: `Bearer ${t}` } });
+        if (!res2.ok) return;
+        const data2 = await res2.json();
+        const charObj = data2.character || data2;
+        setCharacter(charObj);
+        setAttributes(data2.attributes || {});
+        setProtections(data2.protections || []);
+        setResistances(data2.resistances || {});
+        setBackground(data2.background || null);
+        setPhobias(data2.phobias || []);
+        setParanormalEncounters(data2.paranormal_encounters || []);
+      } catch (e) {}
+    };
+    window.addEventListener('character:details_saved', handler);
+
+    return () => { window.removeEventListener('character:details_saved', handler); };
   }, [id]);
 
   // load notes when Notes tab is activated
@@ -175,19 +200,27 @@ export default function CharacterPage() {
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>null);
+          console.warn('Failed to update note', res.status, txt);
+          return;
+        }
       } else {
         const res = await fetch(`http://localhost:3001/characters/${id}/notes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
           body: JSON.stringify(payload)
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          const txt = await res.text().catch(()=>null);
+          console.warn('Failed to create note', res.status, txt);
+          return;
+        }
       }
       await fetchNotes();
       handleNewNote();
     } catch (e) {
-      // ignore
+      console.error('Error saving note', e);
     }
   };
 
@@ -390,7 +423,7 @@ export default function CharacterPage() {
               </div>
 
               <div className="md:col-span-2">
-                <CharacterStates character={character} />
+                <CharacterStates character={character} editable={true} />
               </div>
 
                 <div className="md:col-span-2">
