@@ -2,7 +2,7 @@ const db = require('../config/database');
 
 const ItemsModel = {
   search: (q, callback) => {
-    const sql = `SELECT * FROM items_catalog WHERE name LIKE ? OR description LIKE ? LIMIT 50`;
+    const sql = `SELECT * FROM items_catalog WHERE name LIKE ? OR description LIKE ? ORDER BY name`;
     const like = `%${q}%`;
     db.query(sql, [like, like], (err, results) => {
       if (err) return callback(err);
